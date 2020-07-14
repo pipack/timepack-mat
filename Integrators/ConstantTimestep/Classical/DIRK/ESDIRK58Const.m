@@ -7,7 +7,7 @@ classdef ESDIRK58Const < DI_RKConst
     
     properties(SetAccess = protected)
         name  = 'ESDIRK5[8]'
-        description = '5th-order 8-stage stiffly-accurate L-Stable ESDIRK method (ESDIRK5(4)7L[2]SA_2 C.A. Kennedy, M. H. Carpenter, "Diagonally implicit Runge–Kutta methods for stiff ODEs")';
+        description = '5th-order 8-stage stiffly-accurate L-Stable ESDIRK method (ESDIRK5(4)8L[2]SA_2 C.A. Kennedy, M. H. Carpenter, "Diagonally implicit Runge–Kutta methods for stiff ODEs")';
         order = 5; 
         A = [0 0 0 0 0 0 0 0;
             1/7 1/7 0 0 0 0 0 0;
