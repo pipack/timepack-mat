@@ -4,7 +4,7 @@
 %  Diagonally Implicit Block Method:
 %       y^{(n+1)} = A * y^{(n)} + r * B * y^{(n+1)} + C * y^{(n+1)} + r * D * f^{[n+1]}
 %  with optional output point 
-%       y_out = a_out * y^{(n)} + r * b_out * y^{(n+1)} + c_out * y^{(n+1)} + r * d_out * f^{[n+1]} + r * e_out * f_out 
+%       y_out = a_out * y^{(n)} + r * b_out * f^{(n)} + c_out * y^{(n+1)} + r * d_out * f^{[n+1]} + r * e_out * f_ou 
 %   
 %  A diagonally implicit block method must satisfy the following conditions:
 %   1. The matrix D must be lower triagular
@@ -116,7 +116,7 @@ classdef DI_BLKConst < BLKConst & ImplicitIntegratorConst
                         end
 
                     else % -- system is explicit -----------------------------------------------------------------------
-                        if(problem.real_valued && real_node_flag(j))
+                        if(problem.real_valued && this.real_valued_outputs(j))
                             y_out(:,j) = real(b_j);
                         else
                             y_out(:,j) = b_j;
