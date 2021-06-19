@@ -7,7 +7,7 @@
 %
 %   where y^{(n+1)}, y^{(n)} are qx1 vectors. At the final timestep, the method produces an optional output point
 %
-%       y_out = a_out * y^{(n)} + r * b_out * y^{(n+1)} + c_out * y^{(n+1)} + r * d_out * f^{[n+1]} + r * e_out * f_out 
+%       y_out = a_out * y^{(n)} + r * b_out * f^{(n)} + c_out * y^{(n+1)} + r * d_out * f^{[n+1]} + r * e_out * f_out 
 %
 % ======================================================================================================================
 
@@ -164,7 +164,7 @@ classdef BLKConst < IntegratorConst
             z_outputs   = this.starting_times(:) + this.h;
             
             if(use_outputs)
-                z_all = [this.z(:); z_outputs];
+                z_all = [this.starting_times(:); z_outputs];
                 for k = 1 : num_outputs
                     indices(k) = this.nearestPoint(z_all(1 : num_outputs + k - 1), z_outputs(k));
                 end
