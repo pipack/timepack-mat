@@ -135,7 +135,7 @@ classdef DI_BLKConst < BLKConst & ImplicitIntegratorConst
                     if(conj_j ~= 0 && problem.real_valued) % -- check for conjugate input ------------------------------
                         step_struct.F_out(:, j) = conj(step_struct.F_out(:, conj_j));
                     else
-                        if(this.eval_RHS)
+                        if(this.eval_RHS || c_j == 0)
                             step_struct.F_out(:, j) = problem.RHS(y_out(:, j)); % -- eval directly ---------------------
                         else % -- compute via re-arrangement -----------------------------------------------------------
                             if(this.real_valued_outputs(j))
