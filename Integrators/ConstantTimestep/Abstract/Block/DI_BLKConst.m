@@ -138,7 +138,7 @@ classdef DI_BLKConst < BLKConst & ImplicitIntegratorConst
                         if(this.eval_RHS || c_j == 0)
                             step_struct.F_out(:, j) = problem.RHS(y_out(:, j)); % -- eval directly ---------------------
                         else % -- compute via re-arrangement -----------------------------------------------------------
-                            if(this.real_valued_outputs(j))
+                            if(problem.real_valued && this.real_valued_outputs(j))
                                 step_struct.F_out(:, j) = real(y_out(:,j) - b_j) / real(c_j); 
                             else
                                 step_struct.F_out(:, j) = (y_out(:,j) - b_j) / c_j; 
