@@ -1,17 +1,44 @@
 
 % ======================================================================================================================
 %
-%  Diagonally Implicit Block Method:
+%  Abstract Block Method of the form:
+%
 %       y^{(n+1)} = A * y^{(n)} + r * B * y^{(n+1)} + C * y^{(n+1)} + r * D * f^{[n+1]}
-%  with optional output point 
-%       y_out = a_out * y^{(n)} + r * b_out * f^{(n)} + c_out * y^{(n+1)} + r * d_out * f^{[n+1]} + r * e_out * f_ou 
-%   
-%  A diagonally implicit block method must satisfy the following conditions:
+%
+%   where y^{(n+1)}, y^{(n)} are qx1 vectors. At the final timestep, the method produces an optional output point
+%
+%       y_out = a_out * y^{(n)} + r * b_out * f^{(n)} + c_out * y^{(n+1)} + r * d_out * f^{[n+1]} + r * e_out * f_out 
+%
+%   IMPORTANT! A diagonally implicit block method must satisfy the following conditions:
 %   1. The matrix D must be lower triagular
 %
 % ======================================================================================================================
 
 classdef DI_BLKConst < BLKConst & ImplicitIntegratorConst
+    
+    properties(Abstract = true, SetAccess = protected)
+        A % A Matrix
+        B % B Matrix
+        C % C Matrix
+        D % D Matrix
+    end
+    
+    properties(SetAccess = protected)
+        non_zero_A_indices = {};
+        non_zero_B_indices = {};
+        non_zero_C_indices = {};
+        non_zero_D_indices = {};
+        % -- optional output vector coefficients -----------------------------------------------------------------------
+        a_out = [];
+        b_out = [];
+        c_out = [];
+        d_out = [];
+        e_out = [];
+        z_out = 0;
+        % -- optional coefficients for nonlinear system guess  ---------------------------------------------------------
+        A_extrapolate = [];
+        B_extrapolate = [];
+    end
     
     methods
         
@@ -39,6 +66,54 @@ classdef DI_BLKConst < BLKConst & ImplicitIntegratorConst
     end
     
     methods (Access = protected)
+        
+        function [step_struct, y_in] = initStepStruct(this, ~, y_in, problem)
+            
+            num_outputs = size(this.A, 1);
+            ode_dim     = size(y_in, 1);
+            req_F_in    = unique(cell2mat(this.non_zero_B_indices(:).')); % all indices of f_in required for computation
+            % -- all indices of f_out required for computation ---------------------------------------------------------
+            req_F_out = unique(cell2mat(this.non_zero_D_indices(:).'));
+            % -- all indicies of f_in required for nonlinear solve guess -----------------------------------------------
+            if(this.extrapolate_initial_guess)
+                req_F_extrap = find(any(this.B_extrapolate));                
+                req_F_in = union(req_F_in, req_F_extrap);
+            end            
+            % -- flags for determining if jth RHS should be evaluated during computation -------------------------------
+            req_RHS_flags = false(num_outputs, 1);
+                req_RHS_flags(union(req_F_in, req_F_out)) = true;
+            % -- set nearest inputs for nonlinear solve guess ----------------------------------------------------------
+            nearest_output_indices = this.nearestOutputIndices( ~ this.parallel_initial_guess);
+            
+            step_struct = struct(                           ...
+                'AT',        transpose(this.A),             ...
+                'BT',        transpose(this.B),             ...
+                'CT',        transpose(this.C),             ...
+                'DT',        transpose(this.D),             ...
+                'AT_extrp',  transpose(this.A_extrapolate), ...    
+                'BT_extrp',  transpose(this.B_extrapolate), ...
+                'q',         num_outputs,                   ...
+                'noi',       nearest_output_indices,        ...
+                'req_RHS_F', req_RHS_flags,                 ... % indices of RHS that should be evaluated during computation
+                'F_in',      zeros(ode_dim, num_outputs),   ...
+                'Y_out',     zeros(ode_dim, num_outputs),   ... % Stage Vector
+                'F_out',     zeros(ode_dim, num_outputs)    ... % Stage Derivative Vector
+            );
+        
+            % -- initialize F_in ---------------------------------------------------------------------------------------
+            for j = (req_F_in(:)')
+                conj_j = this.conjugate_inputs(j);
+                if(conj_j ~= 0 && problem.real_valued) % -- check for conjugate input ----------------------------------
+                    this.rhs_stats.startTimer(1); % -- add conj time on first processor
+                    step_struct.F_in(:, j) = conj(step_struct.F_in(:, conj_j));
+                else
+                    this.rhs_stats.startTimer(j);
+                    step_struct.F_in(:, j) = problem.RHS(y_in(:, j)); % -- eval directly -------------------------------
+                end
+                this.rhs_stats.recordRHSEval();                    
+            end
+            
+        end 
         
         function [t_out, y_out, step_struct] = step(this, t_in, y_in, step_struct, problem, final_step)
             
