@@ -1,4 +1,4 @@
-classdef DI_RKConst < IntegratorConst & ImplicitIntegratorConst
+classdef DI_RKConst < RKConst & ImplicitIntegratorConst
     
     properties
         graph_line_style = {};
@@ -15,7 +15,6 @@ classdef DI_RKConst < IntegratorConst & ImplicitIntegratorConst
     end
     
     properties(SetAccess = protected)
-        starting_times = 0;
         non_zero_stage_indices = {};
         non_zero_output_indices = [];
         nearest_stage_indices = {};
@@ -28,11 +27,11 @@ classdef DI_RKConst < IntegratorConst & ImplicitIntegratorConst
             if(nargin == 0)
                 options = struct();
             end
-            this = this@IntegratorConst(options);
+            this = this@RKConst(options);
             this = this@ImplicitIntegratorConst(options);
-            this.non_zero_stage_indices  = this.nonzeroStageIndices();
+            this.non_zero_stage_indices  = this.nonzeroStageIndices(this.A);
             this.non_zero_output_indices = find(this.b);
-            this.nearest_stage_indices   = this.nearestStageIndices();
+            this.nearest_stage_indices   = this.nearestStageIndices(this.c);
             % -- set up stat objects -----------------------------------------------------------------------------------
             num_stages = size(this.A, 1);
             this.nonlinear_solver.stats.reset(num_stages);
@@ -98,26 +97,6 @@ classdef DI_RKConst < IntegratorConst & ImplicitIntegratorConst
             
             this.step_stats.recordStep(toc(step_start_time)); % -- stop step time clock --------------------------------
             
-        end
-        
-        function indices = nonzeroStageIndices(this)
-            
-            num_stages = size(this.A, 1);
-            indices    = cell(num_stages,1);
-            for i = 1 : num_stages
-                indices{i} = find(this.A(i, 1:(i-1)) ~= 0);
-            end
-            
-        end
-        
-        function indices = nearestStageIndices(this)
-            num_stages = size(this.A, 1);
-            indices    = cell(num_stages,1);
-            c_extd     = [0; this.c(:)];
-            for i = 1 : num_stages
-                [~, nearest_index] = min(abs(this.c(i) - c_extd(1:i)));
-                indices{i} = nearest_index - 1;
-            end
         end
         
     end

@@ -1,4 +1,4 @@
-classdef E_RKConst < IntegratorConst
+classdef E_RKConst < RKConst
     
     properties
         graph_line_style = {};
@@ -10,7 +10,6 @@ classdef E_RKConst < IntegratorConst
     end
     
     properties(SetAccess = protected)
-        starting_times = 0;
         non_zero_stage_indices  = {};
         non_zero_output_indices = [];
     end
@@ -21,8 +20,8 @@ classdef E_RKConst < IntegratorConst
             if(nargin == 0)
                 options = struct();
             end
-            this = this@IntegratorConst(options);
-            this.non_zero_stage_indices = this.nonzeroStageIndices();
+            this = this@RKConst(options);
+            this.non_zero_stage_indices = this.nonzeroStageIndices(this.A);
             this.non_zero_output_indices = find(this.b);
         end
         
@@ -64,16 +63,6 @@ classdef E_RKConst < IntegratorConst
             t_out = t_in + h;
             
             this.step_stats.recordStep(toc(step_start_time)); % -- stop step time clock --------------------------------
-            
-        end
-        
-        function indices = nonzeroStageIndices(this)
-            
-            num_stages = size(this.A, 1);
-            indices    = cell(num_stages,1);
-            for i = 1 : num_stages
-                indices{i} = find(this.A(i, 1:(i-1)) ~= 0);
-            end
             
         end
         
