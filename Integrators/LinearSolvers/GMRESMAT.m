@@ -43,6 +43,10 @@ classdef GMRESMAT < LinearSolver
         
         function [y, exit_flag, residual] = solve(this, A, b, x0)
             
+            if(nargin == 4)
+                x0 = zeros(size(b));
+            end 
+            
             starting_time = tic;
             dim = length(x0);
             function y = A_aug_handle(x)
