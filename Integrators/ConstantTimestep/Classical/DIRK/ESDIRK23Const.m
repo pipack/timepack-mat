@@ -8,7 +8,7 @@ classdef ESDIRK23Const < DI_RKConst
     
     properties(SetAccess = protected)
         name  = 'ESDIRK2[3]';
-        description = '2nd-order 3-stage L-Stable ESDIRK method (eq. 219 from C. A. Kennedy, M. H. Carpenter "Diagonally Implicit Runge-Kutta Methods for Ordinary Differential Equations. A Review")'
+        description = '2nd-order, 3-stage, L-Stable ESDIRK method (eq. 219) from C. A. Kennedy, M. H. Carpenter "Diagonally Implicit Runge-Kutta Methods for Ordinary Differential Equations. A Review," 2016'
         order = 2;
     end
     

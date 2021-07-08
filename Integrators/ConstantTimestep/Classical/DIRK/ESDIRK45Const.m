@@ -10,7 +10,7 @@ classdef ESDIRK45Const < DI_RKConst
     
     properties(SetAccess = protected)
         name  = 'ESDIRK4[5]';
-        description = '4th-order 5-stage L-Stable ESDIRK method (eq. 233 and eq. (241)-(246) from C. A. Kennedy, M. H. Carpenter "Diagonally Implicit Runge-Kutta Methods for Ordinary Differential Equations. A Review")'
+        description = '4th-order, 5-stage, L-Stable, ESDIRK method (eq. 233 and eq. (241)-(246)) from C. A. Kennedy, M. H. Carpenter "Diagonally Implicit Runge-Kutta Methods for Ordinary Differential Equations. A Review," 2016'
         order = 4;      
     end
     

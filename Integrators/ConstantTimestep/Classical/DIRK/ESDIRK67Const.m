@@ -6,8 +6,8 @@ classdef ESDIRK67Const < DI_RKConst
     end
     
     properties(SetAccess = protected)
-        name  = 'ESDIRK6[7]';
-        description = '6th-order 7-stage L-Stable ESDIRK method (Table 27 from C. A. Kennedy, M. H. Carpenter "Diagonally Implicit Runge-Kutta Methods for Ordinary Differential Equations. A Review")'
+        name  = 'ESDIRK6(4)7A[2]';
+        description = '6th-order, 7-stage, L-Stable ESDIRK method ESDIRK6(4)7A[2] (Table 27) from C. A. Kennedy, M. H. Carpenter "Diagonally Implicit Runge-Kutta Methods for Ordinary Differential Equations. A Review," 2016'
         order = 6; 
         A = [0 0 0 0 0 0 0;
             5/16, 5/16, 0, 0, 0, 0, 0;
