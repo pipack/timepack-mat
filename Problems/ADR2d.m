@@ -1,15 +1,30 @@
 % ======================================================================================================================
-% ADR Equation
+% The Advection-Diffusion-Reaction (ADR) Equation
 %
-%   u_t = delta * (u_x + u_y) + epsilon * (u_xx + u_yy) + gamma * u(u - 1/2)(1 - u)
+%   u_t = alpha * (u_x + u_y) + epsilon * (u_xx + u_yy) + gamma * u(u - 1/2)(1 - u)
 %
-% With RHS Partitioning
+% with homogeneous Neumann boundary conditions and any of the following splitings:
 %
-%           F     : delta * (u_x + u_y) + epsilon * (u_xx + u_yy) + gamma * u(u - 1/2)(1 - u)
-%           F^{1} : delta * (u_x + u_y) + epsilon * (u_xx + u_yy)
+%   1. Full RHS 
+%
+%       F     : alpha * (u_x + u_y) + epsilon * (u_xx + u_yy) + gamma * u(u - 1/2)(1 - u)
+%
+%   2. Linear / Nonlinear (splitting = 1)
+%
+%           F^{1} : alpha * (u_x + u_y) + epsilon * (u_xx + u_yy)
 %           F^{2} : gamma * u(u - 1/2)(1 - u)
 %
-%   Equation is solved in physical space using a spectral Fourier discretization
+%   3. Diffusion (splitting = 2)
+%
+%           F^{1} : epsilon * (u_xx + u_yy)
+%           F^{2} : alpha * (u_x + u_y) + gamma * u(u - 1/2)(1 - u)
+%
+%   4. Advection (splitting = 3)
+%
+%           F^{1} : alpha * (u_x + u_y)
+%           F^{2} : epsilon * (u_xx + u_yy) + gamma * u(u - 1/2)(1 - u)
+%
+% The equation is solved in physical space using a second-order finite differences.
 %
 % ======================================================================================================================
 
@@ -22,12 +37,8 @@ classdef ADR2d < Problem
             'epsilon',  1/100,  ...
             'alpha',    -10,    ...
             'gamma',    100     ...      
-        );        
-    end
-    
-    properties
-        cache_reference_solutions = false
-        use_cached_reference_solutions = false
+        );
+        splitting = 1;
     end
     
 	properties(SetAccess = protected)
@@ -38,9 +49,14 @@ classdef ADR2d < Problem
         description;
     end
     
+    properties
+        cache_reference_solutions = true;
+        use_cached_reference_solutions = true;
+    end
+    
     properties(Access = private)
-    	linear_operator         % stores stores epsilon * (u_xx + u_yy) + delta * (u_x + u_y)
-        UxUy_operator           % stores delta * (u_x + u_y)
+    	linear_operator         % stores stores epsilon * (u_xx + u_yy) + alpha * (u_x + u_y)
+        UxUy_operator           % stores alpha * (u_x + u_y)
         UxxUyy_operator         % stores epsilon * (u_xx + u_yy)
     end
         
@@ -55,13 +71,33 @@ classdef ADR2d < Problem
                 part = 0;
             end
             
-            switch part
-                case 0 % -- full RHS -----------------------------------------------------------------------------------
-                    up = this.RHS(u, 1) + this.RHS(u, 2);
-                case 1 % -- linear component (ADVECTION & DIFFUSION TERM) ----------------------------------------------
-                    up = this.linear_operator * u;
-                case 2 % -- second component (NONLINEAR TERM) ----------------------------------------------------------
-                    up  = this.params.gamma * u .* (u - 1/2) .* (1 - u);
+            if( part == 0 ) % -- full rhs ------------------------------------------------------------------------------ 
+                up = this.RHS(u, 1) + this.RHS(u, 2);
+                return;
+            end
+            
+            switch this.splitting
+                case 1 % -- semilinear with full linear operator ------------------------------------------------------- 
+                    switch part
+                        case 1 % --> linear component (ADVECTION & DIFFUSION TERM)
+                            up = this.linear_operator * u;
+                        case 2 % --> second component (NONLINEAR TERM)
+                            up  = this.N(u);
+                    end
+                case 2 % -- semilinear with diffusion operator --------------------------------------------------------- 
+                    switch part
+                        case 1 % --> linear component (DIFFUSION TERM)
+                            up = this.UxxUyy_operator * u;
+                        case 2 % --> second component (ADVECTION & NONLINEAR TERM)
+                            up = this.UxUy_operator * u + this.N(u);
+                    end
+                case 3 % -- semilinear with advection operator --------------------------------------------------------- 
+                    switch part
+                        case 1 % --> linear component (ADVECTION TERM)
+                            up = this.UxUy_operator * u;
+                        case 2 % --> second component (DIFFUSION & NONLINEAR TERM)
+                            up = this.UxxUyy_operator * u + this.N(u);
+                    end
             end
         end
 
@@ -70,37 +106,51 @@ classdef ADR2d < Problem
                 part = 0;
             end
             
-            switch part
-                case 0 % -- full Jacobian ------------------------------------------------------------------------------
-                    temp = this.params.gamma * (3*u - 1/2 - 3*u.^2);
-                    J = this.linear_operator + spdiags(temp, 0, this.dimension, this.dimension);
-                case 1 % -- linear component (ADVECTION & DIFFUSION TERM) ----------------------------------------------
-                    J = this.linear_operator;                    
-                case 2 % -- second component (NONLINEAR TERM) ----------------------------------------------------------
-                    temp = this.params.gamma * (3*u - 1/2 - 3*u.^2);
-                    J = spdiags(temp, 0, this.dimension, this.dimension);
+            if( part == 0 ) % -- full rhs ------------------------------------------------------------------------------ 
+                J = this.linear_operator + this.JN(u);
+                return;
             end
+            
+            switch this.splitting
+                case 1 % -- semilinear with full linear operator ------------------------------------------------------- 
+                    switch part
+                        case 1 % --> linear component (ADVECTION & DIFFUSION TERM)
+                            J = this.linear_operator;
+                        case 2 % --> second component (NONLINEAR TERM)
+                            J  = this.JN(u);
+                    end
+                case 2 % -- semilinear with diffusion operator --------------------------------------------------------- 
+                    switch part
+                        case 1 % --> linear component (DIFFUSION TERM)
+                            J = this.UxxUyy_operator;
+                        case 2 % --> second component (ADVECTION NONLINEAR TERM)
+                            J = this.UxUy_operator + this.JN(u);
+                    end
+                case 3 % -- semilinear with advection operator --------------------------------------------------------- 
+                    switch part
+                        case 1 % --> linear component (ADVECTION TERM)
+                            J = this.UxUy_operator;
+                        case 2 % --> second component (DIFFUSION & NONLINEAR TERM)
+                            J = this.UxxUyy_operator + this.JN(u);
+                    end
+            end
+            
         end
         
         function Jx = Jx(this, u, x, part)
             if(nargin == 3)
                 part = 0;
             end
-            
-            switch part
-                case 0 % -- full Jacobian ------------------------------------------------------------------------------
-                    Jx = this.Jx(u, x, 1) + this.Jx(u, x, 2);
-                case 1 % -- linear component (ADVECTION & DIFFUSION TERM) ----------------------------------------------
-                    Jx = this.linear_operator * x;                    
-                case 2 % -- second component (NONLINEAR TERM) ----------------------------------------------------------
-                    temp = this.params.gamma * (3*u - 1/2 - 3*u.^2);
-                    Jx = temp .* x;
-            end
+            Jx = this.J(u,part) * x;
         end
         
-
         function N = N(this, u)
             N = this.params.gamma * u .* (u - 1/2) .* (1 - u);
+        end
+        
+        function JN = JN(this, u)
+            d = this.params.gamma * (3*u - 1/2 - 3*u.^2);
+            JN = spdiags(d, 0, this.dimension, this.dimension);
         end
         
         function L = L(this)
