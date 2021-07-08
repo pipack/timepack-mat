@@ -1,27 +1,27 @@
 % ======================================================================================================================
 % The Advection-Diffusion-Reaction (ADR) Equation
 %
-%   u_t = alpha * (u_x + u_y) + epsilon * (u_xx + u_yy) + gamma * u(u - 1/2)(1 - u)
+%   u_t = delta * (u_x + u_y) + epsilon * (u_xx + u_yy) + gamma * u(u - 1/2)(1 - u)
 %
 % with homogeneous Neumann boundary conditions and any of the following splitings:
 %
 %   1. Full RHS 
 %
-%       F     : alpha * (u_x + u_y) + epsilon * (u_xx + u_yy) + gamma * u(u - 1/2)(1 - u)
+%       F     : delta * (u_x + u_y) + epsilon * (u_xx + u_yy) + gamma * u(u - 1/2)(1 - u)
 %
 %   2. Linear / Nonlinear (splitting = 1)
 %
-%           F^{1} : alpha * (u_x + u_y) + epsilon * (u_xx + u_yy)
+%           F^{1} : delta * (u_x + u_y) + epsilon * (u_xx + u_yy)
 %           F^{2} : gamma * u(u - 1/2)(1 - u)
 %
 %   3. Diffusion (splitting = 2)
 %
 %           F^{1} : epsilon * (u_xx + u_yy)
-%           F^{2} : alpha * (u_x + u_y) + gamma * u(u - 1/2)(1 - u)
+%           F^{2} : delta * (u_x + u_y) + gamma * u(u - 1/2)(1 - u)
 %
 %   4. Advection (splitting = 3)
 %
-%           F^{1} : alpha * (u_x + u_y)
+%           F^{1} : delta * (u_x + u_y)
 %           F^{2} : epsilon * (u_xx + u_yy) + gamma * u(u - 1/2)(1 - u)
 %
 % The equation is solved in physical space using a second-order finite differences.
@@ -35,7 +35,7 @@ classdef ADR2d < Problem
         params    = struct(     ...
             'N',        100,     ...
             'epsilon',  1/100,  ...
-            'alpha',    -10,    ...
+            'delta',    -10,    ...
             'gamma',    100     ...      
         );
         splitting = 1;
@@ -55,8 +55,8 @@ classdef ADR2d < Problem
     end
     
     properties(Access = private)
-    	linear_operator         % stores stores epsilon * (u_xx + u_yy) + alpha * (u_x + u_y)
-        UxUy_operator           % stores alpha * (u_x + u_y)
+    	linear_operator         % stores stores epsilon * (u_xx + u_yy) + delta * (u_x + u_y)
+        UxUy_operator           % stores delta * (u_x + u_y)
         UxxUyy_operator         % stores epsilon * (u_xx + u_yy)
     end
         
@@ -190,12 +190,12 @@ classdef ADR2d < Problem
         
         function setLinearOperator(this)
             epsilon = this.params.epsilon;
-            alpha = this.params.alpha;
+            delta = this.params.delta;
             N = this.params.N;
             h = 1 / (N - 1);
             
             this.UxxUyy_operator =  epsilon / h^2 * FD_OP.UXX_UYY_N(N);
-            this.UxUy_operator   =  alpha / h * FD_OP.UX_UY_N(N);
+            this.UxUy_operator   =  delta / h * FD_OP.UX_UY_N(N);
             this.linear_operator =  this.UxxUyy_operator + this.UxUy_operator;
         end
         
