@@ -72,7 +72,7 @@ classdef Newton < NonlinearSolver
             x_k        = x0;
             residuals  = zeros(this.max_iterations + 1, 1);
             deltas     = zeros(this.max_iterations, 1);
-            seconds    = zeros(this.max_iteration, 1);
+            seconds    = zeros(this.max_iterations, 1);
             clean_exit_flag = false;
             
             while(true) % DOWHILE loop
@@ -98,10 +98,11 @@ classdef Newton < NonlinearSolver
                     GP  = problem.J(x_k);
                     rhs = GP * x_k - G;
                 end
+                x_km1 = x_k;
                 x_k = this.linear_solver.solve(GP, rhs, x_k);
                 % -- increment iteration count and test exit conditions ------------------------------------------------
                 iterations = iterations + 1;
-                deltas(iterations) = this.tol_norm(x_k - y_km1);
+                deltas(iterations) = this.tol_norm(x_k - x_km1);
                 seconds(iterations)  = toc(iteration_start_time);
                 if(deltas(iterations) < this.delta_tolerance) % clean delta exit condition
                     clean_exit_flag = true;
