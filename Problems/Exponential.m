@@ -58,7 +58,7 @@ classdef Exponential < Problem
                 case 0
                     up = this.params.lambda * u;
                 case 1
-                    up = this.params.lambda_1;
+                    up = this.params.lambda_1 * u;
                 case 2
                     up = (this.params.lambda - this.params.lambda_1) * u;
                     
