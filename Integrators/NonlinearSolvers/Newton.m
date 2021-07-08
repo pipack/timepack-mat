@@ -52,7 +52,7 @@ classdef Newton < NonlinearSolver
             end
         end
         
-        function [x_k, clean_exit_flag, final_residual] = solve(this, problem, x0)
+        function [x_k, clean_exit_flag, final_residual] = solve(this, problem, x0, part)
             % SOLVEBC solves system x = b + c * F(x)
             % PARAMETERS
             %   problem (class or struct)   : must have the parameters:
@@ -64,6 +64,11 @@ classdef Newton < NonlinearSolver
             %   b       (vector)            : constant b in nonlinear system
             %   c       (double)            : constant c in nonlinear system
             %   x0      (vector)            : initial guess
+            if(nargin == 3)
+                part_args = {};
+            else
+                part_args = {part};
+            end
             
             mtrx_free = this.matrix_free;
             
@@ -78,7 +83,7 @@ classdef Newton < NonlinearSolver
             while(true) % DOWHILE loop
                 iteration_start_time = tic;
                 % -- Evaluate NL Function G(y) = b + c * f(y) - y ------------------------------------------------------
-                G  = problem.RHS(x_k);
+                G  = problem.RHS(x_k, part_args{:});
                 % -- Calculate residual and test exit conditions -------------------------------------------------------
                 residual_index = iterations + 1;
                 current_residual = this.tol_norm(G);
@@ -92,10 +97,10 @@ classdef Newton < NonlinearSolver
                 end
                 % -- Construct Jacobian and Solve ----------------------------------------------------------------------
                 if(mtrx_free)
-                	GP  = @(y) problem.Jx(x_k, y);
+                	GP  = @(y) problem.Jx(x_k, y, part_args{:});
                     rhs = GP(x_k) - G;
                 else
-                    GP  = problem.J(x_k);
+                    GP  = problem.J(x_k, part_args{:});
                     rhs = GP * x_k - G;
                 end
                 x_km1 = x_k;
@@ -114,7 +119,7 @@ classdef Newton < NonlinearSolver
             this.stats.addSolve(iterations, residuals(1:iterations+1), deltas(1:iterations), seconds(1:iterations))
         end
         
-        function [x_k, clean_exit_flag, final_residual] = solveBC(this, problem, b, c, x0)
+        function [x_k, clean_exit_flag, final_residual] = solveBC(this, problem, b, c, x0, part)
             % SOLVEBC solves system x = b + c * F(x)
             % PARAMETERS
             %   problem (class or struct)   : must have the parameters:
@@ -126,6 +131,11 @@ classdef Newton < NonlinearSolver
             %   b       (vector)            : constant b in nonlinear system
             %   c       (double)            : constant c in nonlinear system
             %   x0      (vector)            : initial guess
+            if(nargin == 5)
+                part_args = {};
+            else
+                part_args = {part};
+            end
             
             % -- read problem properties --------
             mtrx_free = this.matrix_free;
@@ -145,7 +155,7 @@ classdef Newton < NonlinearSolver
             while(true) % DOWHILE loop
                 iteration_start_time = tic;
                 % -- Evaluate NL Function G(y) = b + c * f(y) - y ------------------------------------------------------
-                G  = b + c * problem.RHS(x_k) - x_k;
+                G  = b + c * problem.RHS(x_k, part_args{:}) - x_k;
                 % -- Calculate residual and test exit conditions -------------------------------------------------------
                 residual_index = iterations + 1;
                 current_residual = this.tol_norm(G);
@@ -159,10 +169,10 @@ classdef Newton < NonlinearSolver
                 end
                 % -- Construct Jacobian and Solve ----------------------------------------------------------------------
                 if(mtrx_free)
-                	GP = @(y) c * problem.Jx(x_k, y) - y;
+                	GP = @(y) c * problem.Jx(x_k, y, part_args{:}) - y;
                     rhs = GP(x_k) - G;
                 else
-                    GP  = c * problem.J(x_k) - spdiags(e, 0, dim, dim);
+                    GP  = c * problem.J(x_k, part_args{:}) - spdiags(e, 0, dim, dim);
                     rhs = GP * x_k - G;
                 end
                 x_km1 = x_k;
