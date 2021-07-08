@@ -53,6 +53,10 @@ classdef GMRES < LinearSolver
         
         function [y, exit_flag, residual] = solve(this, A, b, x0)
             
+            if(nargin == 3)
+                x0 = zeros(size(b));
+            end 
+            
             dim = length(x0);
             function y = A_aug_handle(x)
                 y = A(x(1:dim) + 1i * x(dim+1:2*dim));
@@ -85,7 +89,12 @@ classdef GMRES < LinearSolver
         end
         
         
-        function [y, exit_flag, residual] = solveBC(this, A, b, c, x0) % solves x = b + c * A * x           
+        function [y, exit_flag, residual] = solveBC(this, A, b, c, x0) % solves x = b + c * A * x  
+            
+            if(nargin == 4)
+                x0 = zeros(size(b));
+            end    
+            
             if(isnumeric(A))
                 A_hat = speye(size(A)) - c * A;
                 [y, exit_flag, residual] = solve(this, A_hat, b, x0);
