@@ -5,6 +5,11 @@ classdef Problem < matlab.mixin.Copyable % (See https://www.mathworks.com/help/m
         params;        
     end
     
+    properties (Abstract = true)
+        cache_reference_solutions
+        use_cached_reference_solutions
+    end
+    
     properties(SetAccess = protected)
     	reference_solution = [];
     end
@@ -67,6 +72,14 @@ classdef Problem < matlab.mixin.Copyable % (See https://www.mathworks.com/help/m
         end
         
         function setRefSolution(this)
+            cache_path = this.refSolutionCachePath();
+            % -- load from cache ---------------------------------------------------------------------------------------
+            if(this.use_cached_reference_solutions && isfile(cache_path))
+                load(cache_path, 'reference_solution');
+                this.reference_solution = reference_solution;
+                return
+            end
+            
             if(isfield(this.params, 'ref_solve_tol'))
                 ref_solve_tol = this.params.ref_solve_tol;
             else
@@ -75,9 +88,29 @@ classdef Problem < matlab.mixin.Copyable % (See https://www.mathworks.com/help/m
             options = odeset('Jacobian', @(varargin) this.J(varargin{2:end}), 'RelTol', ref_solve_tol, 'AbsTol', ref_solve_tol);
             timeSpan = [this.tspan(1), (this.tspan(1) + this.tspan(2))/2, this.tspan(2)];
             [~,exsol] = ode15s(@(varargin) this.RHS(varargin{2:end}), timeSpan, this.initial_condition, options);
-            this.reference_solution = transpose(exsol(end,:));
+            rs = transpose(exsol(end,:));           
+            this.reference_solution = rs;
+            
+            % -- cache reference solution ------------------------------------------------------------------------------
+            if(this.cache_reference_solutions)
+                [~, ~] = mkdir(fileparts(cache_path)); % ensure directory exists;
+                reference_solution = rs;
+                save(cache_path, 'reference_solution');
+            end
+            
         end
-    
+        
+        function hash = identifier(this)
+            s = this.params;
+            s.tspan = this.tspan;
+            hash = MD5DataHash(s);
+        end
+        
+        function cache_path = refSolutionCachePath(this)
+            pipack_problems_dir = fileparts(which('Problem'));
+            cache_path = fullfile(pipack_problems_dir, 'cache', this.name, [this.identifier(), '.mat']);
+        end
+
     end
     
 end
