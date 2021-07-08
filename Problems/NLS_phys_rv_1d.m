@@ -38,6 +38,11 @@ classdef NLS_phys_rv_1d < Problem
         description;
     end
     
+    properties
+        cache_reference_solutions = true;
+        use_cached_reference_solutions = true;
+    end
+    
 	properties(Access = private)
     	linear_operator;
         ks; % fourier wavenumbers

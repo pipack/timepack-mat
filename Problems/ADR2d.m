@@ -25,6 +25,11 @@ classdef ADR2d < Problem
         );        
     end
     
+    properties
+        cache_reference_solutions = false
+        use_cached_reference_solutions = false
+    end
+    
 	properties(SetAccess = protected)
     	name = 'ADR2d';
         dimension;

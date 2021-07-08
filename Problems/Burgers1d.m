@@ -24,6 +24,11 @@ classdef Burgers1d < Problem
             );
     end
     
+    properties
+        cache_reference_solutions = true;
+        use_cached_reference_solutions = true;
+    end
+    
     properties(SetAccess = protected)
         name = 'Burgers1d';
         dimension;

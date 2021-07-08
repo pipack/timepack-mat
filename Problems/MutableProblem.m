@@ -11,7 +11,10 @@ classdef MutableProblem < Problem
         Jx
         J
         L
-        N       
+        N
+        % -- cache flags --
+        cache_reference_solutions = false
+        use_cached_reference_solutions = false
     end
     
     properties(SetAccess = protected)

@@ -21,6 +21,11 @@ classdef Exponential < Problem
             );
     end
     
+    properties
+        cache_reference_solutions = false;
+        use_cached_reference_solutions = false;
+    end
+    
     properties(SetAccess = protected)
         name = 'Exponential';
         dimension;
