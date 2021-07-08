@@ -9,6 +9,7 @@ classdef GMRESMAT < LinearSolver
         max_iterations;     % (double) max number of iterations for building krylov basis
         force_real;         % (bool) If true, then matrix systems with imaginary values will be represented as real systems of twice the dimension.
         stats;              % (KrylovStats) stats object
+        preconditioners;     % cell array of preconditioners
     end
     
     properties(SetAccess = protected)
@@ -26,6 +27,7 @@ classdef GMRESMAT < LinearSolver
                 {'max_iterations', 100}
                 {'record_stats', false}
                 {'force_real', false}
+                {'preconditioners', {[], []}}
                 };
             options = setDefaultOptions(options, default_options_cell);
             this.max_iterations = options.max_iterations;
@@ -33,6 +35,7 @@ classdef GMRESMAT < LinearSolver
             this.force_real = options.force_real;
             this.stats = KrylovStats();
             this.stats.record = options.record_stats;
+            this.preconditioners = options.preconditioners;
         end
         
         function [y, exit_flag, residual] = solve(this, A, b, x0)
@@ -53,19 +56,19 @@ classdef GMRESMAT < LinearSolver
                         A_aug  = [A_r -A_i; A_i A_r];
                         b_aug  = [real(b); imag(b)];
                         x0_aug = [real(x0); imag(x0)];
-                        [y_aug, flag, residual, iter, resvec] = gmres(A_aug, b_aug, [], this.tolerance, min(2*dim, this.max_iterations), [], [], x0_aug);
+                        [y_aug, flag, residual, iter, resvec] = gmres(A_aug, b_aug, [], this.tolerance, min(2*dim, this.max_iterations), this.preconditioners{:}, x0_aug);
                         y = y_aug(1:dim) + 1i*y_aug(dim+1:2*dim);
                     else
-                        [y, flag, residual, iter, resvec] = gmres(A, b, [], this.tolerance, min(dim, this.max_iterations), [], [], x0);
+                        [y, flag, residual, iter, resvec] = gmres(A, b, [], this.tolerance, min(dim, this.max_iterations), this.preconditioners{:}, x0);
                     end
                 else % -- function handle ------------------------------------------------------------------------------
                     b_aug  = [real(b); imag(b)];
                     x0_aug = [real(x0); imag(x0)];
-                    [y_aug, flag, residual, iter, resvec] = gmres(@A_aug_handle, b_aug, [], this.tolerance, min(2*dim, this.max_iterations), [], [], x0_aug);
+                    [y_aug, flag, residual, iter, resvec] = gmres(@A_aug_handle, b_aug, [], this.tolerance, min(2*dim, this.max_iterations), this.preconditioners{:}, x0_aug);
                     y = y_aug(1:end/2) + 1i * y_aug(end/2+1:end);
                 end
             else
-                [y, flag, residual, iter, resvec] = gmres(A, b, [], this.tolerance, min(dim, this.max_iterations), [], [], x0);
+                [y, flag, residual, iter, resvec] = gmres(A, b, [], this.tolerance, min(dim, this.max_iterations), this.preconditioners{:}, x0);
             end
        
             if(flag == 0)
