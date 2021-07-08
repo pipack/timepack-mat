@@ -9,7 +9,8 @@ classdef GMRESMAT < LinearSolver
         max_iterations;     % (double) max number of iterations for building krylov basis
         force_real;         % (bool) If true, then matrix systems with imaginary values will be represented as real systems of twice the dimension.
         stats;              % (KrylovStats) stats object
-        preconditioners;     % cell array of preconditioners
+        preconditioners;    % cell array of preconditioners
+        restart;            % if non-empty, GMRES will restart arnoldi every restart iterations.
     end
     
     properties(SetAccess = protected)
@@ -27,6 +28,7 @@ classdef GMRESMAT < LinearSolver
                 {'max_iterations', 100}
                 {'record_stats', false}
                 {'force_real', false}
+                {'restart', []}
                 {'preconditioners', {[], []}}
                 };
             options = setDefaultOptions(options, default_options_cell);
@@ -36,6 +38,7 @@ classdef GMRESMAT < LinearSolver
             this.stats = KrylovStats();
             this.stats.record = options.record_stats;
             this.preconditioners = options.preconditioners;
+            this.restart = options.restart;
         end
         
         function [y, exit_flag, residual] = solve(this, A, b, x0)
@@ -59,7 +62,7 @@ classdef GMRESMAT < LinearSolver
                         [y_aug, flag, residual, iter, resvec] = gmres(A_aug, b_aug, [], this.tolerance, min(2*dim, this.max_iterations), this.preconditioners{:}, x0_aug);
                         y = y_aug(1:dim) + 1i*y_aug(dim+1:2*dim);
                     else
-                        [y, flag, residual, iter, resvec] = gmres(A, b, [], this.tolerance, min(dim, this.max_iterations), this.preconditioners{:}, x0);
+                        [y, flag, residual, iter, resvec] = gmres(A, b, this.restart, this.tolerance, min(dim, this.max_iterations), this.preconditioners{:}, x0);
                     end
                 else % -- function handle ------------------------------------------------------------------------------
                     b_aug  = [real(b); imag(b)];
@@ -68,7 +71,7 @@ classdef GMRESMAT < LinearSolver
                     y = y_aug(1:end/2) + 1i * y_aug(end/2+1:end);
                 end
             else
-                [y, flag, residual, iter, resvec] = gmres(A, b, [], this.tolerance, min(dim, this.max_iterations), this.preconditioners{:}, x0);
+                [y, flag, residual, iter, resvec] = gmres(A, b, this.restart, this.tolerance, min(dim, this.max_iterations), this.preconditioners{:}, x0);
             end
        
             if(flag == 0)
