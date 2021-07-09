@@ -53,7 +53,7 @@ classdef Newton < NonlinearSolver
         end
         
         function [x_k, clean_exit_flag, final_residual] = solve(this, problem, x0, part)
-            % SOLVEBC solves system x = b + c * F(x)
+            % SOLVEBC solves system 0 = F(x)
             % PARAMETERS
             %   problem (class or struct)   : must have the parameters:
             %                                   varArgs (Cell)   - additional arguments for F and J
@@ -64,62 +64,88 @@ classdef Newton < NonlinearSolver
             %   b       (vector)            : constant b in nonlinear system
             %   c       (double)            : constant c in nonlinear system
             %   x0      (vector)            : initial guess
+            
             if(nargin == 3)
                 part_args = {};
             else
                 part_args = {part};
             end
             
-            mtrx_free = this.matrix_free;
-            
-            % -- Newton Iteration ---------
-            iterations = 0;
-            x_k        = x0;
-            residuals  = zeros(this.max_iterations + 1, 1);
-            deltas     = zeros(this.max_iterations, 1);
-            seconds    = zeros(this.max_iterations, 1);
-            clean_exit_flag = false;
-            
-            while(true) % DOWHILE loop
-                iteration_start_time = tic;
-                % -- Evaluate NL Function G(y) = b + c * f(y) - y ------------------------------------------------------
-                G  = problem.RHS(x_k, part_args{:});
-                % -- Calculate residual and test exit conditions -------------------------------------------------------
-                residual_index = iterations + 1;
-                current_residual = this.tol_norm(G);
-                residuals(residual_index) = current_residual;
-                if (current_residual < this.residual_tolerance) % clean residual exit condition
-                    clean_exit_flag = true;
-                    break;
-                end
-                if(iterations >= this.max_iterations || current_residual >= this.max_residual_tolerance || isnan(current_residual)) % bad exit conditions
-                    break
-                end
-                % -- Construct Jacobian and Solve ----------------------------------------------------------------------
-                if(mtrx_free)
-                	GP  = @(y) problem.Jx(x_k, y, part_args{:});
-                    rhs = GP(x_k) - G;
-                else
-                    GP  = problem.J(x_k, part_args{:});
-                    rhs = GP * x_k - G;
-                end
-                x_km1 = x_k;
-                x_k = this.linear_solver.solve(GP, rhs, x_k);
-                % -- increment iteration count and test exit conditions ------------------------------------------------
-                iterations = iterations + 1;
-                deltas(iterations) = this.tol_norm(x_k - x_km1);
-                seconds(iterations)  = toc(iteration_start_time);
-                if(deltas(iterations) < this.delta_tolerance) % clean delta exit condition
-                    clean_exit_flag = true;
-                    break;
-                end
-                
+            % -- define function ---------------------------------------------------------------------------------------
+            function Gx = G(x)
+                Gx = problem.RHS(x, part_args{:});
             end
-            final_residual = residuals(residual_index);
-            this.stats.addSolve(iterations, residuals(1:iterations+1), deltas(1:iterations), seconds(1:iterations))
+            
+            % -- define Jacobian ---------------------------------------------------------------------------------------
+            function GPx = Gp(x) % matrix formulation (returns matrix)
+                GPx  = problem.J(x, part_args{:});
+            end
+
+            function GPxH = GpMF(x) % matrix free formulation (returns handle)
+                GPxH = @(y) problem.Jx(x, y, part_args{:});
+            end
+            
+            % -- Newton solve ------------------------------------------------------------------------------------------
+            if( this.matrix_free )
+                [x_k, clean_exit_flag, final_residual] = this.newtonSolver(@G, @GpMF, x0);
+            else
+                [x_k, clean_exit_flag, final_residual] = this.newtonSolver(@G, @Gp, x0);
+            end
+            
         end
         
         function [x_k, clean_exit_flag, final_residual] = solveBC(this, problem, b, c, x0, part)
+        % SOLVEBC solves system x = b + c * F(x)
+        % PARAMETERS
+        %   problem (class or struct)   : must have the parameters:
+        %                                   varArgs (Cell)   - additional arguments for F and J
+        %                                   F       (Handle) - function for F(x)
+        %                               and one of the following
+        %                                   Jxy (Handle) - function @(x,y) returning product of jacobian at x with vector y
+        %                                   J (Handle) - function @(x) returning matrix representing the jacobian of F at x
+        %   b       (vector)            : constant b in nonlinear system
+        %   c       (double)            : constant c in nonlinear system
+        %   x0      (vector)            : initial guess
+        %   part    (integer)           : options, specify if only F is only a part of the RHS
+            if(nargin == 5)
+                part_args = {};
+            else
+                part_args = {part};
+            end
+            
+            % -- define function ---------------------------------------------------------------------------------------
+            function Gx = G(x)
+                Gx = b + c * problem.RHS(x, part_args{:}) - x;
+            end
+            
+            % -- define Jacobian ---------------------------------------------------------------------------------------
+            spI = [];
+            if( ~ this.matrix_free )
+                spI = speye(length(x0));
+            end
+            
+            function GPx = Gp(x) % matrix formulation (returns matrix)
+                GPx  = c * problem.J(x, part_args{:}) - spI;
+            end
+
+            function GPxH = GpMF(x) % matrix free formulation (returns handle)
+                GPxH = @(y) c * problem.Jx(x, y, part_args{:}) - y;
+            end
+            
+            % -- Newton solve ------------------------------------------------------------------------------------------
+            if( this.matrix_free )
+                [x_k, clean_exit_flag, final_residual] = this.newtonSolver(@G, @GpMF, x0);
+            else
+                [x_k, clean_exit_flag, final_residual] = this.newtonSolver(@G, @Gp, x0);
+            end
+
+        end
+          
+    end
+
+    methods ( Access = private )
+        
+        function [x_k, clean_exit_flag, final_residual] = newtonSolver(this, G, GP, x0)
             % SOLVEBC solves system x = b + c * F(x)
             % PARAMETERS
             %   problem (class or struct)   : must have the parameters:
@@ -131,20 +157,8 @@ classdef Newton < NonlinearSolver
             %   b       (vector)            : constant b in nonlinear system
             %   c       (double)            : constant c in nonlinear system
             %   x0      (vector)            : initial guess
-            if(nargin == 5)
-                part_args = {};
-            else
-                part_args = {part};
-            end
             
-            % -- read problem properties --------
-            mtrx_free = this.matrix_free;
-            if(mtrx_free == false)
-                dim = length(x0);
-                e = ones(dim, 1); % create vector of ones for jacobian
-            end
-            
-            % -- Newton Iteration ---------
+            % -- Newton Iteration --------------------------------------------------------------------------------------
             iterations = 0;
             x_k        = x0;
             residuals  = zeros(this.max_iterations + 1, 1);
@@ -154,11 +168,11 @@ classdef Newton < NonlinearSolver
             
             while(true) % DOWHILE loop
                 iteration_start_time = tic;
-                % -- Evaluate NL Function G(y) = b + c * f(y) - y ------------------------------------------------------
-                G  = b + c * problem.RHS(x_k, part_args{:}) - x_k;
+                % -- Evaluate Nonlinear Function -----------------------------------------------------------------------
+                G_k = G(x_k);
                 % -- Calculate residual and test exit conditions -------------------------------------------------------
                 residual_index = iterations + 1;
-                current_residual = this.tol_norm(G);
+                current_residual = this.tol_norm(G_k);
                 residuals(residual_index) = current_residual;
                 if (current_residual < this.residual_tolerance) % clean residual exit condition
                     clean_exit_flag = true;
@@ -168,19 +182,20 @@ classdef Newton < NonlinearSolver
                     break
                 end
                 % -- Construct Jacobian and Solve ----------------------------------------------------------------------
-                if(mtrx_free)
-                	GP = @(y) c * problem.Jx(x_k, y, part_args{:}) - y;
-                    rhs = GP(x_k) - G;
+                GP_k = GP(x_k);
+                
+                if(isnumeric(GP_k))
+                    rhs = GP_k * x_k - G_k;
                 else
-                    GP  = c * problem.J(x_k, part_args{:}) - spdiags(e, 0, dim, dim);
-                    rhs = GP * x_k - G;
+                    rhs = GP_k(x_k) - G_k;
                 end
+                
                 x_km1 = x_k;
-                x_k   = this.linear_solver.solve(GP, rhs, x_k);
+                x_k   = this.linear_solver.solve(GP_k, rhs, x_k);
                 % -- increment iteration count and test exit conditions ------------------------------------------------
                 iterations = iterations + 1;
                 deltas(iterations) = this.tol_norm(x_k - x_km1);
-                seconds(iterations)  = toc(iteration_start_time);
+                seconds(iterations) = toc(iteration_start_time);
                 if(deltas(iterations) < this.delta_tolerance) % clean delta exit condition
                     clean_exit_flag = true;
                     break;
@@ -190,7 +205,7 @@ classdef Newton < NonlinearSolver
             final_residual = residuals(residual_index);
             this.stats.addSolve(iterations, residuals(1:iterations+1), deltas(1:iterations), seconds(1:iterations))
         end
-        
+         
     end
-   
+
 end
