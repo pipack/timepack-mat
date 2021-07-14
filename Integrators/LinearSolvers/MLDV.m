@@ -40,6 +40,41 @@ classdef MLDV < LinearSolver
             end
             this.stats.recordSolve(toc(starting_time));
         end
+        
+        function [x, exit_flag, residual] = solveBCKronA(this, A, b, C, varargin)
+        % As (cell array of n matrices) 
+        % b  (vector n * size(As,1))
+        % C  (matrix nxn)
+            
+            % solves (I - kron(C,A)) x = b
+            starting_time = tic;
+            n_C = size(C,1);
+            n_A = size(A,1);
+            x = (speye(n_C * n_A) - kron(C, A)) \ b;
+            exit_flag = true;
+            if(nargout > 2)
+                residual = norm(kron(C, A) * x - b, 2);
+            end
+            this.stats.recordSolve(toc(starting_time));
+        end
+        
+        function [x, exit_flag, residual] = solveBCKronAs(this, As, b, C, varargin)
+        % As (cell array of n matrices) 
+        % b  (vector n * size(As,1))
+        % C  (matrix nxn)
+             
+            % solves (I - kron(C,A)) x = b
+            starting_time = tic;
+            n_C = size(C,1);
+            n_A = size(As{1},1);
+            A_aug = speye(n_C * n_A) - kron(C, speye(n_A)) * blkdiag(As{:});
+            x = A_aug \ b;
+            exit_flag = true;
+            if(nargout > 2)
+                residual = norm(A_aug * x - b, 2);
+            end
+            this.stats.recordSolve(toc(starting_time));
+        end
        
     end
     

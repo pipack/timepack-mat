@@ -86,8 +86,11 @@ classdef GMRESMAT < LinearSolver
             this.stats.recordSolve(iter, resvec, toc(starting_time));
         end
         
-        
         function [y, exit_flag, residual] = solveBC(this, A, b, c, x0)
+        % A - matrix or function handle
+        % c - constant
+        % b - vector of dimension size(A,1)
+        % x0 - optional initial guess
             if(nargin == 4)
                 x0 = zeros(size(b));
             end
@@ -99,6 +102,72 @@ classdef GMRESMAT < LinearSolver
                 [y, exit_flag, residual] = solve(this, A_hat, b, x0);
             end
             
+        end
+        
+        function [y, exit_flag, residual] = solveBCKronA(this, A, b, C, x0)
+        % A - matrix or function handle
+        % C - square matrix
+        % b - vector of dimension (size(A,1) * size(C,2))
+        % x0 - optional initial guess
+            
+            if(nargin == 4)
+                x0 = zeros(size(b));
+            end
+            
+            C_n = size(C,1);
+            A_n = length(b) / C_n; % deduce from b (in case A is a handle)
+            
+            function p = kronProdHandle(x) % function handle that returns (I - kron(M,A))                    
+                p = x;
+                for i = 1 : C_n
+                    i_inds = (1 : A_n) + (i - 1) * A_n;
+                    for j = 1 : C_n
+                        j_inds = (1 : A_n) + (j - 1) * A_n;
+                        p(i_inds) = p(i_inds) - C(i,j) * A(x(j_inds));
+                    end
+                end               
+            end
+            
+            if(isnumeric(A))
+                A_hat = speye(A_n * C_n) - kron(C, A);
+                [y, exit_flag, residual] = solve(this, A_hat, b, x0);
+            else
+                [y, exit_flag, residual] = solve(this, @kronProdHandle, b, x0);
+            end  
+
+        end
+        
+        function [y, exit_flag, residual] = solveBCKronAs(this, As, b, C, x0)
+        % As - cell of nxn matrices or cell of function handles 
+        % C - square matrix
+        % b - vector of dimension (size(A,1) * size(C,2))
+        % x0 - optional initial guess
+            
+            if(nargin == 4)
+                x0 = zeros(size(b));
+            end
+            
+            C_n = size(C,1);
+            A_n = length(b) / C_n; % deduce from b (in case A is a handle)
+            
+            function p = kronProdHandle(x) % function handle that returns (I - kron(C, speye(n_A)) * blkdiag(As{:}));                    
+                p = x;
+                for i = 1 : C_n
+                    i_inds = (1 : A_n) + (i - 1) * A_n;
+                    for j = 1 : C_n
+                        j_inds = (1 : A_n) + (j - 1) * A_n;
+                        p(i_inds) = p(i_inds) - C(i,j) * As{j}(x(j_inds));
+                    end
+                end               
+            end
+            
+            if(isnumeric(As{1}))
+                A_hat = speye(A_n * C_n) - kron(C, speye(A_n)) * blkdiag(As{:});
+                [y, exit_flag, residual] = solve(this, A_hat, b, x0);
+            else
+                [y, exit_flag, residual] = solve(this, @kronProdHandle, b, x0);
+            end  
+
         end
         
     end
