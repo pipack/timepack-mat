@@ -178,6 +178,9 @@ classdef Newton < NonlinearSolver
                 % -- Construct Jacobian and Solve (handled by update function) -----------------------------------------
                 x_km1 = x_k;
                 [x_k, exit_flag] = update(x_k, G_k);
+                if( ~ exit_flag)
+                    break;
+                end
                 % -- increment iteration count and test exit conditions ------------------------------------------------
                 iterations = iterations + 1;
                 deltas(iterations) = this.tol_norm(x_k - x_km1);
