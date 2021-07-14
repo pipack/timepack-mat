@@ -138,7 +138,69 @@ classdef Newton < NonlinearSolver
             [x_k, clean_exit_flag, final_residual] = this.genericNewtonSolver(@G, update_handle, x0);
 
         end
-                  
+        
+        function [x_k, clean_exit_flag, final_residual] = solveBCKronF(this, problem, b, C, x0, part)
+        % Solve the system x = b + kron(C, F) where C is a matrix. 
+        % PARAMETERS
+        %   problem (Problem) : the functions RHS, J, and JS are used
+        %   b       (vector)  : constant b in nonlinear system
+        %   C       (matrix)  : matrix C in nonlinear system
+        %   x0      (vector)  : initial guess
+        %   part    (int)     : optional; specify if F(x) is only a part of the full RHS
+            if(nargin == 5)
+                part_args = {};
+            else
+                part_args = {part};
+            end
+            
+            C_n = size(C,1);
+            dim = length(b) / C_n;
+            zv  = zeros(length(b),1); % initial guess
+            
+            % -- define function ---------------------------------------------------------------------------------------
+            function Gx = G(x) % G(x) = b + kron(C, speye(dim)) * blkdiag({RHS_1, ... RHS_{Cn}}) - x;     
+                Gx = x - b;
+                for j = 1 : C_n
+                    j_inds = (1 : dim) + (j - 1) * dim;
+                    RHS_j = problem.RHS(x(j_inds), part_args{:});
+                    for i = 1 : C_n
+                        i_inds = (1 : dim) + (i - 1) * dim;
+                        Gx(i_inds) = Gx(i_inds) - C(i,j) * RHS_j;
+                    end
+                end
+            end
+            
+            % -- define update handle ----------------------------------------------------------------------------------
+            function [x_kp1, exit_flag] = update(x_k, G_k) % produces x_{k+1} from x_k and G_k = G(x_k)
+                Js = cell(C_n, 1);
+                for j = 1 : C_n
+                    j_inds = (1 : dim) + (j - 1) * dim;
+                    Js{j} = problem.J(x_k(j_inds), part_args{:});                   
+                end
+                [delta, exit_flag] = this.linear_solver.solveBCKronAs(Js, -G_k, C, zv);
+                x_kp1 = x_k + delta;
+            end
+            
+            function [x_kp1, exit_flag] = updateMF(x_k, G_k) % produces x_{k+1} from x_k and G_k = G(x_k)
+                Js = cell(C_n, 1);
+                for j = 1 : C_n
+                    j_inds = (1 : dim) + (j - 1) * dim;
+                    Js{j} = @(y) problem.Jx(x_k(j_inds), y, part_args{:});                 
+                end
+                [delta, exit_flag] = this.linear_solver.solveBCKronAs(Js, -G_k, C, zv);
+                x_kp1 = x_k + delta;
+            end
+            
+            % -- Newton solve ------------------------------------------------------------------------------------------
+            if(this.matrix_free)
+                update_handle = @updateMF;
+            else
+                update_handle = @update;
+            end
+            [x_k, clean_exit_flag, final_residual] = this.genericNewtonSolver(@G, update_handle, x0);
+            
+        end
+          
     end
 
     methods ( Access = private )
