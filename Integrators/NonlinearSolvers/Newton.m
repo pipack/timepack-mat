@@ -55,15 +55,9 @@ classdef Newton < NonlinearSolver
         function [x_k, clean_exit_flag, final_residual] = solve(this, problem, x0, part)
             % SOLVEBC solves system 0 = F(x)
             % PARAMETERS
-            %   problem (class or struct)   : must have the parameters:
-            %                                   varArgs (Cell)   - additional arguments for F and J
-            %                                   F       (Handle) - function for F(x)
-            %                               and one of the following
-            %                                   Jxy (Handle) - function @(x,y) returning product of jacobian at x with vector y
-            %                                   J (Handle) - function @(x) returning matrix representing the jacobian of F at x
-            %   b       (vector)            : constant b in nonlinear system
-            %   c       (double)            : constant c in nonlinear system
-            %   x0      (vector)            : initial guess
+            %   problem (Problem) : the functions RHS, J, and JS are used
+            %   x0      (vector)  : initial guess
+            %   part    (int)     : optional; specify if F(x) is only a part of the full RHS
             
             if(nargin == 3)
                 part_args = {};
@@ -71,92 +65,92 @@ classdef Newton < NonlinearSolver
                 part_args = {part};
             end
             
+            zv = zeros(length(b),1); % initial guess
+            
             % -- define function ---------------------------------------------------------------------------------------
             function Gx = G(x)
                 Gx = problem.RHS(x, part_args{:});
             end
             
-            % -- define Jacobian ---------------------------------------------------------------------------------------
-            function GPx = Gp(x) % matrix formulation (returns matrix)
-                GPx  = problem.J(x, part_args{:});
-            end
-
-            function GPxH = GpMF(x) % matrix free formulation (returns handle)
-                GPxH = @(y) problem.Jx(x, y, part_args{:});
+            % -- update handle: computes x_{k+1} = x_{k} - J(x_k)^{-1} G(x_k) where J is Jacobian of G -----------------
+            function [x_kp1, exit_flag] = update(x_k, G_k)
+                J = problem.J(x_k, part_args{I});
+                [delta, exit_flag] = this.linear_solver.solve(J, -G_k, zv);
+                x_kp1 = x_k + delta;
             end
             
+            function [x_kp1, exit_flag] = updateMF(x_k, G_k)  % matrix-free equivalent
+                J = @(y) problem.Jx(x_k, y, part_args{I});
+                [delta, exit_flag] = this.linear_solver.solve(J, -G_k, zv);
+                x_kp1 = x_k + delta;
+            end 
+             
             % -- Newton solve ------------------------------------------------------------------------------------------
-            if( this.matrix_free )
-                [x_k, clean_exit_flag, final_residual] = this.newtonSolver(@G, @GpMF, x0);
+            if(this.matrix_free)
+                update_handle = @updateMF;
             else
-                [x_k, clean_exit_flag, final_residual] = this.newtonSolver(@G, @Gp, x0);
+                update_handle = @update;
             end
+            [x_k, clean_exit_flag, final_residual] = this.genericNewtonSolver(@G, update_handle, x0);
             
         end
-        
+         
         function [x_k, clean_exit_flag, final_residual] = solveBC(this, problem, b, c, x0, part)
         % SOLVEBC solves system x = b + c * F(x)
         % PARAMETERS
-        %   problem (class or struct)   : must have the parameters:
-        %                                   varArgs (Cell)   - additional arguments for F and J
-        %                                   F       (Handle) - function for F(x)
-        %                               and one of the following
-        %                                   Jxy (Handle) - function @(x,y) returning product of jacobian at x with vector y
-        %                                   J (Handle) - function @(x) returning matrix representing the jacobian of F at x
-        %   b       (vector)            : constant b in nonlinear system
-        %   c       (double)            : constant c in nonlinear system
-        %   x0      (vector)            : initial guess
-        %   part    (integer)           : options, specify if only F is only a part of the RHS
+        %   problem (Problem) : the functions RHS, J, and JS are used
+        %   b       (vector)  : constant b in nonlinear system
+        %   c       (double)  : constant c in nonlinear system
+        %   x0      (vector)  : initial guess
+        %   part    (int)     : optional; specify if F(x) is only a part of the full RHS
             if(nargin == 5)
                 part_args = {};
             else
                 part_args = {part};
             end
             
-            % -- define function ---------------------------------------------------------------------------------------
+            zv = zeros(length(b),1); % initial guess
+            
+            % -- define function G -------------------------------------------------------------------------------------
             function Gx = G(x)
-                Gx = b + c * problem.RHS(x, part_args{:}) - x;
+                Gx = x - (b + c * problem.RHS(x, part_args{:}));
             end
             
-            % -- define Jacobian ---------------------------------------------------------------------------------------
-            spI = [];
-            if( ~ this.matrix_free )
-                spI = speye(length(x0));
+            % -- update handle: computes x_{k+1} = x_{k} - J(x_k)^{-1} G(x_k) where J is Jacobian of G -----------------
+            function [x_kp1, exit_flag] = update(x_k, G_k) 
+                J = problem.J(x_k, part_args{:});
+                [delta, exit_flag] = this.linear_solver.solveBC(J, -G_k, c, zv); %(I - c * J)^{-1} * -G_k
+                x_kp1 = x_k + delta;
             end
             
-            function GPx = Gp(x) % matrix formulation (returns matrix)
-                GPx  = c * problem.J(x, part_args{:}) - spI;
+            function [x_kp1, exit_flag] = updateMF(x_k, G_k) % matrix-free equivalent
+                Jp = @(y) problem.Jx(x_k, part_args{:});
+                [delta, exit_flag] = this.linear_solver.solveBC(Jp, -G_k, c, zv);
+                x_kp1 = x_k + delta;
             end
-
-            function GPxH = GpMF(x) % matrix free formulation (returns handle)
-                GPxH = @(y) c * problem.Jx(x, y, part_args{:}) - y;
-            end
-            
+             
             % -- Newton solve ------------------------------------------------------------------------------------------
-            if( this.matrix_free )
-                [x_k, clean_exit_flag, final_residual] = this.newtonSolver(@G, @GpMF, x0);
+            if(this.matrix_free)
+                update_handle = @updateMF;
             else
-                [x_k, clean_exit_flag, final_residual] = this.newtonSolver(@G, @Gp, x0);
+                update_handle = @update;
             end
+            [x_k, clean_exit_flag, final_residual] = this.genericNewtonSolver(@G, update_handle, x0);
 
         end
-          
+                  
     end
 
     methods ( Access = private )
         
-        function [x_k, clean_exit_flag, final_residual] = newtonSolver(this, G, GP, x0)
-            % SOLVEBC solves system x = b + c * F(x)
+        function [x_k, clean_exit_flag, final_residual] = genericNewtonSolver(this, G, update, x0)
+            % GENERICNEWTONSOLVER solves the nonlinear system G(x) = 0
             % PARAMETERS
-            %   problem (class or struct)   : must have the parameters:
-            %                                   varArgs (Cell)   - additional arguments for F and J
-            %                                   F       (Handle) - function for F(x)
-            %                               and one of the following
-            %                                   Jxy (Handle) - function @(x,y) returning product of jacobian at x with vector y
-            %                                   J (Handle) - function @(x) returning matrix representing the jacobian of F at x
-            %   b       (vector)            : constant b in nonlinear system
-            %   c       (double)            : constant c in nonlinear system
-            %   x0      (vector)            : initial guess
+            %   G (function)      - nonlinear function
+            %   update (function) - computes x_{k+1} = x_{k} - J(x_k)^{-1} G(x_k) where J is Jacobian of G. The function
+            %                       must accept the following parameters: 
+            %                           x_k - current guess
+            %                           G_k - pre-evaluated G(x_k)
             
             % -- Newton Iteration --------------------------------------------------------------------------------------
             iterations = 0;
@@ -181,17 +175,9 @@ classdef Newton < NonlinearSolver
                 if(iterations >= this.max_iterations || current_residual >= this.max_residual_tolerance || isnan(current_residual)) % bad exit conditions
                     break
                 end
-                % -- Construct Jacobian and Solve ----------------------------------------------------------------------
-                GP_k = GP(x_k);
-                
-                if(isnumeric(GP_k))
-                    rhs = GP_k * x_k - G_k;
-                else
-                    rhs = GP_k(x_k) - G_k;
-                end
-                
+                % -- Construct Jacobian and Solve (handled by update function) -----------------------------------------
                 x_km1 = x_k;
-                x_k   = this.linear_solver.solve(GP_k, rhs, x_k);
+                [x_k, exit_flag] = update(x_k, G_k);
                 % -- increment iteration count and test exit conditions ------------------------------------------------
                 iterations = iterations + 1;
                 deltas(iterations) = this.tol_norm(x_k - x_km1);
