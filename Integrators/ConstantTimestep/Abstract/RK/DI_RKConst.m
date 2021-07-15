@@ -18,7 +18,6 @@ classdef DI_RKConst < RKConst & ImplicitIntegratorConst
         non_zero_stage_indices = {};
         non_zero_output_indices = [];
         nearest_stage_indices = {};
-        A_inv;
     end
     
     methods
