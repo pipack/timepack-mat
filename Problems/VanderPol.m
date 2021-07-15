@@ -1,7 +1,7 @@
 classdef VanderPol < Problem
     
 	properties(SetObservable)
-        tspan     = [0, 0.55139];
+        tspan     = [0, 0.5];
         params    = struct(     ...
             'epsilon',  1e-1    ...    
         );        
