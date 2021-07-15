@@ -58,13 +58,13 @@ classdef IMEXConst < ImplicitIntegratorConst & LinearlyImplicitIntegratorConst
         function [x, clean_exit] = solveBC(this, problem, b, c, y_guess, y0)
             % SOLVEBC solves linear or nonlinear problem associated
             %
-            % If this.linearly_implicit = true, solves the system
+            % If this.linearly_implicit = true, solves the linear system
             %
-            %   (I - c * problem.J()) * x = b
+            %   (I - c * problem.J(y0)) * x = b
             %
-            % If this.linearly_implicit = false, solve the nonlinear syste
+            % If this.linearly_implicit = false, solve the nonlinear system
             %
-            %   (I - c * problem.J()) * x = b
+            %   (x - c * problem.RHS(x)) = b
             %
             % -- Paramters --------------------------------
             %  problem - object that defines ode
@@ -78,6 +78,33 @@ classdef IMEXConst < ImplicitIntegratorConst & LinearlyImplicitIntegratorConst
                [x, clean_exit] = this.linear_solver.solveBC(this.evalJ(problem, y0, part), b, c, y_guess);
             else
                [x, clean_exit] = this.nonlinear_solver.solveBC(problem, b, c, y_guess, part);
+            end
+            
+        end
+        
+        function [x, clean_exit] = solveBCKronF(this, problem, b, C, y_guess, y0)
+            % SOLVEBC solves linear or nonlinear problem associated
+            %
+            % If this.linearly_implicit = true, solves the linear system
+            %
+            %   (I - kron(C,problem.J(y0)) * x = b
+            %
+            % If this.linearly_implicit = false, solve the nonlinear system
+            %
+            %   x - kron(C, F(x)) = b 
+            %
+            % -- Paramters --------------------------------
+            %  problem - object that defines ode
+            %  b (vector)
+            %  c (constant)
+            %  y_guess (vector) - guess for linear or nonlinear solver
+            %  y0 - location of linearization (only used if this.linearly_implicit = true)
+            
+            part = 1; % treat first part implicitly
+            if(this.linearly_implicit || this.linearize)
+               [x, clean_exit] = this.linear_solver.solveBCKronA(this.evalJ(problem, y0, part), b, C, y_guess);
+            else
+               [x, clean_exit] = this.nonlinear_solver.solveBCKronF(problem, b, C, y_guess, part);
             end
             
         end
