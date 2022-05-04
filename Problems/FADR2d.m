@@ -35,7 +35,7 @@ classdef FADR2d < Problem
             'delta',    -1,      ...
             'gamma',    10      ...
         );
-        splitting = 2;
+        splitting = 1;
     end
     
 	properties(SetAccess = protected)
@@ -85,9 +85,9 @@ classdef FADR2d < Problem
                     end
                 case 2 % -- forcing paired with diffusion -------------------------------------------------------------- 
                     switch part
-                        case 1 % --> linear component (DIFFUSION)
+                        case 1 % --> linear component (ADVECTION)
                             up = this.UxUy_operator * u;
-                        case 2 % --> second component (ADVECTION)
+                        case 2 % --> second component (DIFFUSION)
                             up = this.UxxUyy_operator * u + this.forcingFunction(u(end)) + this.N(u);
                     end
             end
