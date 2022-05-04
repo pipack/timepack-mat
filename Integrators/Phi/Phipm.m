@@ -341,7 +341,7 @@ classdef Phipm < PhiEvaluator
                 
                 % Compute the exponential of the augmented matrix
                 
-                [F, hnorm] = expmhigham(sgn * tau * H(1:j + p, 1:j + p));
+                [F, hnorm] = this.expm_raw(sgn * tau * H(1:j + p, 1:j + p));
                 exps = exps + 1;
                 % Local truncation error estimation
                 err = abs(beta * h * F(j, j + p));
@@ -438,7 +438,7 @@ classdef Phipm < PhiEvaluator
                     
                     for k = 0:blownTs - 1
                         tauPhantom = t(l+k) - t_now;
-                        F2 = expmhigham(sgn * tauPhantom * H(1:j + p, 1:j + p));
+                        F2 = this.expm_raw(sgn * tauPhantom * H(1:j + p, 1:j + p));
                         up2 = w(:,l+blownTs) + int(:, 2:p - 1) * cumprod(tauPhantom * 1 ./ (1: p - 2)');
                         F2(j + 1, j + p - 1) = h * F2(j, j + p);
                         w(:,l+k) = beta * V(:, 1:j + 1) * F2(1:j + 1, j + p - 1) + up2;
@@ -502,7 +502,7 @@ classdef Phipm < PhiEvaluator
             
         end
         
-        function F = expm_raw(this, A)
+        function [F, normA] = expm_raw(this, A)
             %   Compute the matrix exponential of A using a scaling and squaring
             %   algorithm with a Pade approximation.
             %
