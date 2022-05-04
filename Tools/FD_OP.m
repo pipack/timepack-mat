@@ -48,6 +48,21 @@ classdef FD_OP
             LOP = FD_OP.construct_1d(@weights, @num_nonzero_elements, N);
         end
         
+        function LOP = UXX_P(N)
+            
+            function [left, center, right] = weights(~, ~)
+                left   = 1;
+                center = -2;
+                right  = 1;
+            end
+            
+            function nnz = num_nonzero_elements(N)
+                nnz = 3 * N; % number of nonzero entries
+            end
+            
+            LOP = FD_OP.construct_1d_periodic(@weights, @num_nonzero_elements, N);
+        end
+        
         function LOP = UX_D(N)
             
             function [left, center, right] = weights(~, ~)
@@ -89,6 +104,21 @@ classdef FD_OP
             LOP = FD_OP.construct_1d(@weights, @num_nonzero_elements, N);
         end
         
+        function LOP = UX_P(N)
+            
+            function [left, center, right] = weights(~, ~)
+                left   = -1;
+                center = 0;
+                right  = 1;
+            end
+            
+            function nnz = num_nonzero_elements(N)
+                nnz = 2 * N; % number of nonzero entries: inner grid points ((N-2) 3 node stencils) + grid boundries (2 sides of with 2 node stencils)
+            end
+            
+            LOP = FD_OP.construct_1d_periodic(@weights, @num_nonzero_elements, N);
+        end
+        
         % == START 1D SPARSE MATRIX CONSTRUCTION FUNCTIONS =============================================================
         
         function LOP = construct_1d(weight_handle, nnz_handle, N)
@@ -116,6 +146,47 @@ classdef FD_OP
                 
                 if(i > 1 && w_left ~= 0) % -- left connection ------------------------------------------------------
                     data(:, count) = [index, index - 1, w_left];
+                    count = count + 1;
+                end
+                
+            end
+            
+            LOP = sparse(data(1,:), data(2, :), data(3, :), N, N);
+            
+        end
+        
+        function LOP = construct_1d_periodic(weight_handle, nnz_handle, N)
+            % Constructs 1D 3-point FD operator with connections at left, right, center stencil
+            % weights can vary at each node location and should be provided as a function handle
+            
+            num_non_zero = nnz_handle(N);
+            data = zeros(3, num_non_zero); % stores (i, j, v) pairs
+            count = 1;
+            
+            for i = 1 : N
+                index = i;
+                % --- CREATE STENCIL -------------------------------------------------------------------------------
+                
+                [w_left, w_center, w_right] = weight_handle(i, N);
+                
+                if(w_center ~= 0) % -- center connection -----------------------------------------------------------
+                    data(:, count) = [index, index, w_center];
+                    count = count + 1;
+                end
+                if (i < N && w_right ~= 0) % -- right connection ---------------------------------------------------
+                    data(:, count) = [index, index + 1, w_right];
+                    count = count + 1;
+                elseif (i == N && w_right ~= 0) % -- wrap around condition ---------------------------------------------------
+                    data(:, count) = [index, 1, w_right];
+                    count = count + 1;
+                end
+                
+                
+                if(i > 1 && w_left ~= 0) % -- left connection ------------------------------------------------------
+                    data(:, count) = [index, index - 1, w_left];
+                    count = count + 1;
+                elseif(i == 1 && w_left ~= 0) % -- left connection ------------------------------------------------------
+                    data(:, count) = [index, N, w_left];
                     count = count + 1;
                 end
                 
@@ -191,6 +262,26 @@ classdef FD_OP
             LOP = FD_OP.construct_2d_ur_frozen(@weights, @num_nonzero_elements, N);
         end
         
+        function LOP = UXX_UYY_P(N)
+            % UXX_UYY_D: 2nd-order Finite Difference Operator for 2D Laplacian with all Dirchelt boundary conditions.
+            % N represents number of interior grid points (not including boundary)
+            
+            % -- Set weights for 5-Point stencil -----------------------------------------------------------------------
+            function [center, top, right, bottom, left] = weights(~, ~, ~)
+                center = -4;
+                top    = 1;
+                right  = 1;
+                bottom = 1;
+                left   = 1;
+            end
+            
+            function nnz = num_nonzero_elements(N)
+                nnz = (N - 2) * (N - 2) * 5 + 4 * (N - 2) * 4 + 4 * 3; % number of nonzero entries: inner grid points ((N-2)(N-2) 5 node stencils) + grid boundries (4 sides of width N-2 with 4 node stencils) + corners (4 corners with 3 node stencils)
+            end
+            
+            LOP = FD_OP.construct_2d_periodic(@weights, @num_nonzero_elements, N);
+        end
+        
         function LOP = UX_UY_N(N)
             % 2D FD Operator for U_x + U_y with all Neumann Boundary conditions. N represents number of total grid
             % points (including boundary)
@@ -256,6 +347,27 @@ classdef FD_OP
             LOP = FD_OP.construct_2d_ur_frozen(@weights, @num_nonzero_elements, N);
         end
         
+        function LOP = UX_UY_P(N)
+            % 2D FD Operator for U_x + U_y with all Dirchlet Boundary conditions. N represents number of interior grid
+            % points (not including boundary)
+            
+            % -- Set weights for 5-Point stencil -----------------------------------------------------------------------
+            function [center, top, right, bottom, left] = weights(~, ~, ~)
+                % -- center --------------------------------------------------------------------------------------------
+                center = 0;
+                top = -1/2;
+                right = 1/2;
+                bottom = 1/2;
+                left = -1/2;
+            end
+            
+            function nnz = num_nonzero_elements(N)
+                nnz = (N-2)^2 * 4 + 4 * (N-2) * 3 + 4 * 2;  % number of nonzero entries: interior grid points ((N-2)(N-2) total points with  4 node stencils) + inner boundries (4 boundries of N-2 points with 3 node stencils) + 4 corners with 2 node stencils.
+            end
+            
+            LOP = FD_OP.construct_2d_periodic(@weights, @num_nonzero_elements, N);
+        end
+        
         % == START 2D SPARSE MATRIX CONSTRUCTION FUNCTIONS =============================================================
         
         function LOP = construct_2d(weight_handle, nnz_handle, N)
@@ -294,6 +406,64 @@ classdef FD_OP
                     
                     if(i < N && w_bottom ~= 0) % -- bottom connection --------------------------------------------------
                         data(:, count) = [index, index + N, w_bottom];
+                        count = count + 1;
+                    end
+                    
+                end
+            end
+            
+            LOP = sparse(data(1,:), data(2, :), data(3, :), N * N, N * N);
+            
+        end
+        
+        function LOP = construct_2d_periodic(weight_handle, nnz_handle, N)
+            % Constructs 5-point FD operator with connections at top, bottom, left, right, center stencil
+            % weights can vary at each node location and should be provided as a function handle
+            
+            num_non_zero = nnz_handle(N);
+            data = zeros(3, num_non_zero); % stores (i, j, v) pairs
+            count = 1;
+            
+            for i = 1 : N
+                for j = 1 : N
+                    index = (i - 1) * N + j;
+                    % --- CREATE STENCIL -------------------------------------------------------------------------------
+                    
+                    [w_center, w_top, w_right, w_bottom, w_left] = weight_handle(i, j, N);
+                    
+                    if(w_center ~= 0) % -- center connection -----------------------------------------------------------
+                        data(:, count) = [index, index, w_center];
+                        count = count + 1;
+                    end
+                    if (j < N && w_right ~= 0) % -- right connection ---------------------------------------------------
+                        data(:, count) = [index, index + 1, w_right];
+                        count = count + 1;
+                    elseif (j == N && w_right ~= 0)
+                        data(:, count) = [index, index - N + 1, w_right];
+                        count = count + 1;
+                    end
+                    
+                    if(j > 1 && w_left ~= 0) % -- left connection ------------------------------------------------------
+                        data(:, count) = [index, index - 1, w_left];
+                        count = count + 1;
+                    elseif (j == 1 && w_left ~= 0)
+                        data(:, count) = [index, index + N - 1, w_left];
+                        count = count + 1;
+                    end
+                    
+                    if(i > 1 && w_top ~= 0) % -- bottom connection --------------------------------------------------------
+                        data(:, count) = [index, index - N, w_top];
+                        count = count + 1;
+                    elseif(i == 1 && w_top ~= 0)
+                        data(:, count) = [index, index + N * (N - 1), w_top];
+                        count = count + 1;
+                    end
+                    
+                    if(i < N && w_bottom ~= 0) % -- top connection --------------------------------------------------
+                        data(:, count) = [index, index + N, w_bottom];
+                        count = count + 1;
+                    elseif(i == N && w_bottom ~= 0)
+                        data(:, count) = [index, index - N  * (N - 1), w_top];
                         count = count + 1;
                     end
                     
