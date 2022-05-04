@@ -1,3 +1,17 @@
+% =========================================================================
+%
+% Exponential polynomial block methods (EPBM) with Legendre nodes from [1]. 
+%
+%   options:
+%       q     - number of nodes (default 3).
+%       kappa - number of iterator applications (default 0).
+%       alpha - extrapolation factor (default 2).
+%
+% [1] Buvoli, Tommaso. "Exponential polynomial block methods." SIAM Journal
+% on Scientific Computing 43.3 (2021): A1692-A1722.
+%
+% =========================================================================
+
 classdef epiPBMConst < IntegratorConst & ExponentialIntegratorConst
     
     properties
@@ -39,7 +53,7 @@ classdef epiPBMConst < IntegratorConst & ExponentialIntegratorConst
         end
         
         function setQ(this, q)
-            leg = legpts(q - 1, [0 2]) / this.alpha;
+            leg = legpts(q - 1, [0 2]);
             if(q > 3)
                 this.order = q + 1;
             else
@@ -57,75 +71,79 @@ classdef epiPBMConst < IntegratorConst & ExponentialIntegratorConst
     methods (Access = protected)
         
         function [step_struct, y_in] = initStepStruct(this, t_in, y_in, problem)
-            
-            % -- define remainder function -----------------------------------------------------------------------------
-            h    = this.h;
-            w    = this.wts;
-            hF_n = h * problem.RHS(y_in);                            % calculate right hand side
-            hJ_n = h * problem.J(y_in);                              % calculate Jacobian
-            hR   = @(y) h * problem.RHS(y) - hF_n - hJ_n*(y - y_in); % remainder function
-            
-            step_struct = struct(...
-                'b', zeros(size(y_in,1), this.q), ...
-                'r', zeros(size(y_in,1), this.q - 1), ...
-                'hF_n', hF_n, ...
-                'hJ_n', hJ_n ...
+                        
+            ode_dim = size(y_in, 1);
+
+            step_struct = struct( ...
+                'r',    this.h / this.alpha, ....
+                'b',    zeros(ode_dim, this.q), ...
+                'rR',   zeros(ode_dim, this.q - 1), ...
+                'rF_n', zeros(ode_dim, 1), ...
+                'rJ_n', [] ...
             );
         
+            y_in = repmat(y_in, [1, this.q]);
+            
             % -- iterate for initial conditions ------------------------------------------------------------------------
             for i = 1 : this.q + this.kappa
-                % -- form vectors b ------------------------------------------------------------------------------------
-                step_struct.b(:, 2 : end) = step_struct.r * w;
-                step_struct.b(:, 2) = step_struct.b(:,2) + hF_n;
-                % -- advance solution ----------------------------------------------------------------------------------
-                y_out = y_in + this.phi_evaluator.solve(this.z(2:end), hJ_n, step_struct.b);               
-                for j = 1 : this.q - 1
-                    step_struct.r(:, j) = hR(y_out(:,j));
-                end                
+                [~, y_in, step_struct] = this.pstep(0, t_in, y_in, step_struct, problem);
             end
-        
+                
         end
         
-        function [t_out, y_out, step_struct] = step(this, t_in, y_in, step_struct, problem, ~)
+        function [t_out, y_out, step_struct, exit_flag] = pstep(this, alpha, t_in, y_in, step_struct, problem)
+           
+            % -- evaluate Remainder ---------------------------------------            
+            step_struct = this.evalR(y_in, step_struct, problem);            
+            % -- form vectors b -------------------------------------------
+            step_struct.b(:, 2:end) = step_struct.rR * this.wts;
+            step_struct.b(:, 2) = step_struct.b(:,2) + step_struct.rF_n;
+            % -- advance solution --------------------------------------------------------------------------------------
+            [phi_rR, exit_flag] = this.phi_evaluator.solve(this.z + alpha, step_struct.rJ_n, step_struct.b);
+            y_out = y_in(:, 1) + phi_rR;
+            t_out = t_in + step_struct.r * alpha;
+                 
+        end
+        
+        function [step_struct, r] = evalR(this, y_in, step_struct, problem) % Evaluate Remainder at Nodes 2, ..., q
+            
+            r   = this.h / this.alpha;
+            y_n = y_in(:, 1);
+            
+            rF_n = r * problem.RHS(y_n);                                    % calculate right hand side
+            rJ_n = r * problem.J(y_n);                                      % calculate Jacobian
+            rR   = @(y) r * problem.RHS(y) - rF_n - rJ_n*(y - y_n);         % remainder function
+           
+            for j = 1 : this.q - 1 % evaluate at nodes z_2, ..., z_q
+                step_struct.rR(:, j) = rR(y_in(:, j + 1));
+            end
+            
+            % store r * F_n and r * J_n
+            step_struct.rF_n = rF_n;
+            step_struct.rJ_n = rJ_n; 
+
+        end
+        
+        function [t_out, y_out, step_struct] = step(this, t_in, y_in, step_struct, problem, final_step_flag)
             
             step_start_time = tic;
             
-            h    = this.h;
-            % -- form vectors b ----------------------------------------------------------------------------------------
-            step_struct.b(:, 2:end) = step_struct.r * this.wts;
-            step_struct.b(:, 2) = step_struct.b(:,2) + step_struct.hF_n;
-            % -- advance solution --------------------------------------------------------------------------------------
-            [y_out, exit_flag] = this.phi_evaluator.solve(this.z + 1, step_struct.hJ_n, step_struct.b);
+            [t_out, y_out, step_struct, exit_flag] = pstep(this, this.alpha, t_in, y_in, step_struct, problem);
             if(exit_flag == false)
                 t_out = NaN; y_out = NaN; return;
             end
-            y_out = y_in + y_out;
-            t_out = t_in + h;
-            % -- define remainder function -----------------------------------------------------------------------------
-            y_n  = y_out(:, 1);
-            hF_n = h * problem.RHS(y_n);                            % calculate right hand side
-            hJ_n = h * problem.J(y_n);                              % calculate Jacobian
-            hR   = @(y) h * problem.RHS(y) - hF_n - hJ_n*(y - y_n); % remainder function
-            % -- evaluate remainder terms ------------------------------------------------------------------------------
-            for j = 2 : this.q
-                step_struct.r(:, j-1) = hR(y_out(:,j));
-            end
-            step_struct.hF_n = hF_n;
-            step_struct.hJ_n = hJ_n;
-            y_out = y_out(:,1);            
             
-            % -- optional iteration ------------------------------------------------------------------------------------
             for i = 1 : this.kappa
-                % -- form vectors b ------------------------------------------------------------------------------------
-                step_struct.b(:, 2 : end) = step_struct.r * this.wts;
-                step_struct.b(:, 2) = step_struct.b(:,2) + hF_n;
-                % -- advance solution ----------------------------------------------------------------------------------
-                ys_out = y_out + this.phi_evaluator.solve(this.z(2:end), hJ_n, step_struct.b);               
-                for j = 1 : this.q - 1
-                    step_struct.r(:, j) = hR(ys_out(:,j));
-                end                
+                [t_out, y_out, step_struct, exit_flag] = pstep(this, 0, t_out, y_out, step_struct, problem);
+                if(exit_flag == false)
+                    t_out = NaN; y_out = NaN; return;
+                end
             end
-            
+                                    
+            if(final_step_flag)
+                y_out = y_out(:, 1);
+            end
+
             % Update counters.
             this.step_stats.recordStep(toc(step_start_time));
             
