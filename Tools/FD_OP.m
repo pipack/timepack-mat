@@ -66,9 +66,9 @@ classdef FD_OP
         function LOP = UX_D(N)
             
             function [left, center, right] = weights(~, ~)
-                left   = -1;
+                left   = -1/2;
                 center = 0;
-                right  = 1;
+                right  = 1/2;
             end
             
             function nnz = num_nonzero_elements(N)
@@ -107,9 +107,9 @@ classdef FD_OP
         function LOP = UX_P(N)
             
             function [left, center, right] = weights(~, ~)
-                left   = -1;
+                left   = -1/2;
                 center = 0;
-                right  = 1;
+                right  = 1/2;
             end
             
             function nnz = num_nonzero_elements(N)
