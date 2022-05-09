@@ -198,6 +198,8 @@ classdef FD_OP
         
         % == START 2D OPERATORS ========================================================================================
         
+        % --> mixed derivatives
+        
         function LOP = UXX_UYY_D(N)
             % UXX_UYY_D: 2nd-order Finite Difference Operator for 2D Laplacian with all Dirchelt boundary conditions.
             % N represents number of interior grid points (not including boundary)
@@ -367,7 +369,303 @@ classdef FD_OP
             
             LOP = FD_OP.construct_2d_periodic(@weights, @num_nonzero_elements, N);
         end
-               
+        
+        % --> only x derivatives
+        
+        function LOP = UX_N2d(N)
+            % 2D FD Operator for U_x with all Neumann Boundary conditions. N represents number of total grid
+            % points (including boundary)
+            %
+            % Note: Implementation uses ghost nodes, and then reduce the new augemented system back into an N*N matrix.
+            % See for example: R. J. LeVeque "Finite Difference Methods for Ordinary DIfferential Equations", Section 2.12 (p. 31).
+            
+            % -- Set weights for 5-Point stencil -----------------------------------------------------------------------
+            function [center, top, right, bottom, left] = weights(i, j, N)
+                % -- zero weights --------------------------------------------------------------------------------------
+                center = 0; top = 0; bottom = 0;
+                % -- right ---------------------------------------------------------------------------------------------
+                if(j == 1)
+                    right = 0;
+                else
+                    right = 1/2;
+                end
+                % -- left ----------------------------------------------------------------------------------------------
+                if(j == N)
+                    left = 0;
+                else
+                    left = -1/2;
+                end
+            end
+            
+            function nnz = num_nonzero_elements(N)
+                nnz = (N-2)^2 * 2 + 2 * (N-2) * 2;  % number of nonzero entries: interior grid points ((N-2)(N-2) total points with  2 node stencils) + inner boundries (2 boundries of N-2 points with 2 node stencils).
+            end
+            
+            LOP = FD_OP.construct_2d_ur_frozen(@weights, @num_nonzero_elements, N);
+        end
+        
+        function LOP = UX_D2d(N)
+            % 2D FD Operator for U_x with all Dirchlet Boundary conditions. N represents number of interior grid
+            % points (not including boundary)
+            
+            % -- Set weights for 5-Point stencil -----------------------------------------------------------------------
+            function [center, top, right, bottom, left] = weights(~, ~, ~)
+                % -- center --------------------------------------------------------------------------------------------
+                center = 0;
+                top    = 0;
+                right  = 1/2;
+                bottom = 0;
+                left   = -1/2;
+            end
+            
+            function nnz = num_nonzero_elements(N)
+                nnz = (N-2)^2 * 2 + 2 * (N-2) * 3 + 4 * 1;  % number of nonzero entries: interior grid points ((N-2)(N-2) total points with 2 node stencils) + inner boundries (2 boundries of N-2 points with 3 node stencils) + 4 corners with 1 node stencils.
+            end
+            
+            LOP = FD_OP.construct_2d_ur_frozen(@weights, @num_nonzero_elements, N);
+        end
+        
+        function LOP = UX_P2d(N)
+            % 2D FD Operator for U_x + U_y with all Dirchlet Boundary conditions. N represents number of interior grid
+            % points (not including boundary)
+            
+            % -- Set weights for 5-Point stencil -----------------------------------------------------------------------
+            function [center, top, right, bottom, left] = weights(~, ~, ~)
+                % -- center --------------------------------------------------------------------------------------------
+                center = 0;
+                top    = 0;
+                right  = 1/2;
+                bottom = 0;
+                left   = -1/2;
+            end
+            
+            function nnz = num_nonzero_elements(N)
+                nnz = (N-2)^2 * 2 + 4 * (N-2) * 2 + 4 * 2;  % number of nonzero entries: interior grid points ((N-2)(N-2) total points with 2 node stencils) + inner boundries (4 boundries of N-2 points with 2 node stencils) + 4 corners with 2 node stencils.
+            end
+            
+            LOP = FD_OP.construct_2d_periodic(@weights, @num_nonzero_elements, N);
+        end
+        
+        function LOP = UXX_D2d(N)
+            % UXX_D2d: 2nd-order Finite Difference Operator for U_xx with all Dirchelt boundary conditions.
+            % N represents number of interior grid points (not including boundary)
+            
+            % -- Set weights for 5-Point stencil -----------------------------------------------------------------------
+            function [center, top, right, bottom, left] = weights(~, ~, ~)
+                center = -2;
+                top    = 0;
+                right  = 1;
+                bottom = 0;
+                left   = 1;
+            end
+            
+            function nnz = num_nonzero_elements(N)
+                nnz = (N - 2) * (N - 2) * 3 + 4 * (N - 2) * 2 + 4 * 2; % number of nonzero entries: inner grid points ((N-2)(N-2) 3 node stencils) + grid boundries (4 sides of width N-2 with 2 node stencils) + corners (4 corners with 2 node stencils)
+            end
+            
+            LOP = FD_OP.construct_2d_ur_frozen(@weights, @num_nonzero_elements, N);
+        end
+        
+        function LOP = UXX_N2d(N)
+            % UXX_N2d: 2nd order FD operator for U_xx with all Neumann boundary conditions. N represents number of total grid
+            % points (including boundary)
+            %
+            % Note: Implementation uses ghost nodes, and then reduce the new augemented system back into an N*N matrix.
+            % See for example: R. J. LeVeque "Finite Difference Methods for Ordinary DIfferential Equations", Section 2.12 (p. 31).
+            
+            % -- Set weights for 5-Point stencil -----------------------------------------------------------------------
+            function [center, top, right, bottom, left] = weights(i, j, N)
+                % -- zero weights --------------------------------------------------------------------------------------
+                center = -2; top = 0; bottom = 0;
+                % -- right ---------------------------------------------------------------------------------------------
+                if(j == 1)
+                    right = 2;
+                else
+                    right = 1;
+                end
+                % -- left ----------------------------------------------------------------------------------------------
+                if(j == N)
+                    left = 2;
+                else
+                    left = 1;
+                end
+            end
+            
+            function nnz = num_nonzero_elements(N)
+                nnz = (N - 2) * (N - 2) * 2 + 4 * (N - 2) * 2 + 4 * 2;  % number of nonzero entries: inner grid points ((N-2)(N-2) 3 node stencils) + grid boundries (4 sides of width N-2 with 2 node stencils) + corners (4 corners with 2 node stencils)
+            end
+            
+            LOP = FD_OP.construct_2d_ur_frozen(@weights, @num_nonzero_elements, N);
+        end
+        
+        function LOP = UXX_P2d(N)
+            % UXX_UYY_D: 2nd-order Finite Difference Operator for U_xx with all Dirchelt boundary conditions.
+            % N represents number of interior grid points (not including boundary)
+            
+            % -- Set weights for 5-Point stencil -----------------------------------------------------------------------
+            function [center, top, right, bottom, left] = weights(~, ~, ~)
+                center = -2;
+                top    = 1;
+                right  = 0;
+                bottom = 1;
+                left   = 0;
+            end
+            
+            function nnz = num_nonzero_elements(N)
+                nnz = (N - 2) * (N - 2) * 3 + 4 * (N - 2) * 3 + 4 * 3; % number of nonzero entries: inner grid points ((N-2)(N-2) 3 node stencils) + grid boundries (4 sides of width N-2 with 5 node stencils) + corners (4 corners with 5 node stencils)
+            end
+            
+            LOP = FD_OP.construct_2d_periodic(@weights, @num_nonzero_elements, N);
+        end
+        
+        % --> only y derivatives
+        
+        function LOP = UY_N2d(N)
+            % 2D FD Operator for U_y with all Neumann Boundary conditions. N represents number of total grid
+            % points (including boundary)
+            %
+            % Note: Implementation uses ghost nodes, and then reduce the new augemented system back into an N*N matrix.
+            % See for example: R. J. LeVeque "Finite Difference Methods for Ordinary DIfferential Equations", Section 2.12 (p. 31).
+            
+            % -- Set weights for 5-Point stencil -----------------------------------------------------------------------
+            function [center, top, right, bottom, left] = weights(i, j, N)
+                % -- zero weights --------------------------------------------------------------------------------------
+                center = 0; left = 0; right = 0;
+                % -- top -----------------------------------------------------------------------------------------------
+                if(i == N)
+                    top = 0;
+                else
+                    top = -1/2;
+                end
+                % -- bottom --------------------------------------------------------------------------------------------
+                if(i == 1)
+                    bottom = 0;
+                else
+                    bottom = 1/2;
+                end
+            end
+            
+            function nnz = num_nonzero_elements(N)
+                nnz = (N-2)^2 * 2 + 2 * (N-2) * 2;  % number of nonzero entries: interior grid points ((N-2)(N-2) total points with  2 node stencils) + inner boundries (2 boundries of N-2 points with 2 node stencils).
+            end
+            
+            LOP = FD_OP.construct_2d_ur_frozen(@weights, @num_nonzero_elements, N);
+        end
+        
+        function LOP = UY_D2d(N)
+            % 2D FD Operator for U_y with all Dirchlet Boundary conditions. N represents number of interior grid
+            % points (not including boundary)
+            
+            % -- Set weights for 5-Point stencil -----------------------------------------------------------------------
+            function [center, top, right, bottom, left] = weights(~, ~, ~)
+                % -- center --------------------------------------------------------------------------------------------
+                center = 0;
+                top    = -1/2;
+                right  = 0;
+                bottom = 1/2;
+                left   = 0;
+            end
+            
+            function nnz = num_nonzero_elements(N)
+                nnz = (N-2)^2 * 2 + 2 * (N-2) * 3 + 4 * 1;  % number of nonzero entries: interior grid points ((N-2)(N-2) total points with 2 node stencils) + inner boundries (2 boundries of N-2 points with 3 node stencils) + 4 corners with 1 node stencils.
+            end
+            
+            LOP = FD_OP.construct_2d_ur_frozen(@weights, @num_nonzero_elements, N);
+        end
+        
+        function LOP = UY_P2d(N)
+            % 2D FD Operator for U_y with all Dirchlet Boundary conditions. N represents number of interior grid
+            % points (not including boundary)
+            
+            % -- Set weights for 5-Point stencil -----------------------------------------------------------------------
+            function [center, top, right, bottom, left] = weights(~, ~, ~)
+                % -- center --------------------------------------------------------------------------------------------
+                center = 0;
+                top    = -1/2;
+                right  = 0;
+                bottom = 1/2;
+                left   = 0;
+            end
+            
+            function nnz = num_nonzero_elements(N)
+                nnz = (N-2)^2 * 2 + 4 * (N-2) * 2 + 4 * 2;  % number of nonzero entries: interior grid points ((N-2)(N-2) total points with 2 node stencils) + inner boundries (4 boundries of N-2 points with 2 node stencils) + 4 corners with 2 node stencils.
+            end
+            
+            LOP = FD_OP.construct_2d_periodic(@weights, @num_nonzero_elements, N);
+        end
+        
+        function LOP = UYY_D2d(N)
+            % UYY_D2d: 2nd-order Finite Difference Operator for U_yy with all Dirchelt boundary conditions.
+            % N represents number of interior grid points (not including boundary)
+            
+            % -- Set weights for 5-Point stencil -----------------------------------------------------------------------
+            function [center, top, right, bottom, left] = weights(~, ~, ~)
+                center = -2;
+                top    = 1;
+                right  = 0;
+                bottom = 1;
+                left   = 0;
+            end
+            
+            function nnz = num_nonzero_elements(N)
+                nnz = (N - 2) * (N - 2) * 3 + 4 * (N - 2) * 2 + 4 * 2; % number of nonzero entries: inner grid points ((N-2)(N-2) 3 node stencils) + grid boundries (4 sides of width N-2 with 2 node stencils) + corners (4 corners with 2 node stencils)
+            end
+            
+            LOP = FD_OP.construct_2d_ur_frozen(@weights, @num_nonzero_elements, N);
+        end
+        
+        function LOP = UYY_N2d(N)
+            % UYY_N2d: 2nd order FD operator for U_yy with all Neumann boundary conditions. N represents number of total grid
+            % points (including boundary)
+            %
+            % Note: Implementation uses ghost nodes, and then reduce the new augemented system back into an N*N matrix.
+            % See for example: R. J. LeVeque "Finite Difference Methods for Ordinary DIfferential Equations", Section 2.12 (p. 31).
+            
+            % -- Set weights for 5-Point stencil -----------------------------------------------------------------------
+            function [center, top, right, bottom, left] = weights(i, j, N)
+                % -- zero weights --------------------------------------------------------------------------------------
+                center = -2; left = 0; right = 0;
+                % -- top -----------------------------------------------------------------------------------------------
+                if(i == N)
+                    top = 2;
+                else
+                    top = 1;
+                end
+                % -- bottom --------------------------------------------------------------------------------------------
+                if(i == 1)
+                    bottom = 2;
+                else
+                    bottom = 1;
+                end
+            end
+            
+            function nnz = num_nonzero_elements(N)
+                nnz = (N - 2) * (N - 2) * 2 + 4 * (N - 2) * 2 + 4 * 2;  % number of nonzero entries: inner grid points ((N-2)(N-2) 3 node stencils) + grid boundries (4 sides of width N-2 with 2 node stencils) + corners (4 corners with 2 node stencils)
+            end
+            
+            LOP = FD_OP.construct_2d_ur_frozen(@weights, @num_nonzero_elements, N);
+        end
+        
+        function LOP = UYY_P2d(N)
+            % UXX_UYY_D: 2nd-order Finite Difference Operator for U_xx with all Dirchelt boundary conditions.
+            % N represents number of interior grid points (not including boundary)
+            
+            % -- Set weights for 5-Point stencil -----------------------------------------------------------------------
+            function [center, top, right, bottom, left] = weights(~, ~, ~)
+                center = -2;
+                top    = 0;
+                right  = 1;
+                bottom = 0;
+                left   = 1;
+            end
+            
+            function nnz = num_nonzero_elements(N)
+                nnz = (N - 2) * (N - 2) * 3 + 4 * (N - 2) * 3 + 4 * 3; % number of nonzero entries: inner grid points ((N-2)(N-2) 3 node stencils) + grid boundries (4 sides of width N-2 with 5 node stencils) + corners (4 corners with 5 node stencils)
+            end
+            
+            LOP = FD_OP.construct_2d_periodic(@weights, @num_nonzero_elements, N);
+        end
+        
         % == START 2D SPARSE MATRIX CONSTRUCTION FUNCTIONS =============================================================
         
         function LOP = construct_2d(weight_handle, nnz_handle, N)
