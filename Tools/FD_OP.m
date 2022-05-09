@@ -276,7 +276,7 @@ classdef FD_OP
             end
             
             function nnz = num_nonzero_elements(N)
-                nnz = (N - 2) * (N - 2) * 5 + 4 * (N - 2) * 4 + 4 * 3; % number of nonzero entries: inner grid points ((N-2)(N-2) 5 node stencils) + grid boundries (4 sides of width N-2 with 4 node stencils) + corners (4 corners with 3 node stencils)
+                nnz = (N - 2) * (N - 2) * 5 + 4 * (N - 2) * 5 + 4 * 5; % number of nonzero entries: inner grid points ((N-2)(N-2) 5 node stencils) + grid boundries (4 sides of width N-2 with 5 node stencils) + corners (4 corners with 5 node stencils)
             end
             
             LOP = FD_OP.construct_2d_periodic(@weights, @num_nonzero_elements, N);
@@ -362,12 +362,12 @@ classdef FD_OP
             end
             
             function nnz = num_nonzero_elements(N)
-                nnz = (N-2)^2 * 4 + 4 * (N-2) * 3 + 4 * 2;  % number of nonzero entries: interior grid points ((N-2)(N-2) total points with  4 node stencils) + inner boundries (4 boundries of N-2 points with 3 node stencils) + 4 corners with 2 node stencils.
+                nnz = (N-2)^2 * 2 + 4 * (N-2) * 2 + 4 * 2;  % number of nonzero entries: interior grid points ((N-2)(N-2) total points with 2 node stencils) + inner boundries (4 boundries of N-2 points with 2 node stencils) + 4 corners with 2 node stencils.
             end
             
             LOP = FD_OP.construct_2d_periodic(@weights, @num_nonzero_elements, N);
         end
-        
+               
         % == START 2D SPARSE MATRIX CONSTRUCTION FUNCTIONS =============================================================
         
         function LOP = construct_2d(weight_handle, nnz_handle, N)
