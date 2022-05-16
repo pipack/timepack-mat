@@ -72,7 +72,7 @@ classdef DI_BLKConst < BLKConst & ImplicitIntegratorConst
             
             % --> additional logic
             fields = fieldnames(prop_struct);
-            if(contains(fields, {'A', 'B', 'C', 'D'})) 
+            if(any(contains(fields, {'A', 'B', 'C', 'D'}))) 
                 this.verifyCefficientMatrices();
                 this.setNonZeroMatrixIndices();
             end
