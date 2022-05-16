@@ -14,6 +14,11 @@ classdef RKConst < IntegratorConst
     
     methods (Access = protected)
         
+        function [t_user, y_user] = userOutput(this, t_in, y_in, struct_in, t_out, y_out, struct_out, problem)
+            t_user = t_out;
+            y_user = y_out;
+        end
+        
         function indices = nonzeroStageIndices(this, A)
             
             num_stages = size(A, 1);
