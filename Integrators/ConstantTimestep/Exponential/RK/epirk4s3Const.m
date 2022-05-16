@@ -29,7 +29,7 @@ classdef epirk4s3Const < IntegratorConst & ExponentialIntegratorConst
             step_struct = struct();
         end
         
-        function [t_out, y_out, step_struct] = step(this, t_in, y_in, step_struct, problem, final_step)
+        function [t_out, y_out, step_struct] = step(this, t_in, y_in, step_struct, problem)
             
             %  Coefficients for
             %  U_2     = u_n + alpha21*(p211 Phi_1(g21 z)+p212 Phi_2(g21 z)+p213 Phi_3(g21 z))hF
@@ -107,6 +107,11 @@ classdef epirk4s3Const < IntegratorConst & ExponentialIntegratorConst
             % Update counters.
             this.step_stats.recordStep(toc(step_start_time));
             
+        end
+        
+        function [t_user, y_user] = userOutput(this, t_in, y_in, struct_in, t_out, y_out, struct_out, problem)
+            t_user = t_out;
+            y_user = y_out;
         end
         
     end

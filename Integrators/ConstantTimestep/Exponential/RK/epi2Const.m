@@ -63,6 +63,11 @@ classdef epi2Const < IntegratorConst & ExponentialIntegratorConst
             
         end
         
+        function [t_user, y_user] = userOutput(this, t_in, y_in, struct_in, t_out, y_out, struct_out, problem)
+            t_user = t_out;
+            y_user = y_out;
+        end
+        
     end
     
 end

@@ -37,7 +37,7 @@ classdef epi3Const < IntegratorConst & ExponentialIntegratorConst
                 );
         end
         
-        function [t_out, y_out, step_struct] = step(this, t_in, y_in, step_struct, problem, final_step)
+        function [t_out, y_out, step_struct] = step(this, t_in, y_in, step_struct, problem)
             
             step_start_time = tic;
             mtrx_free = this.matrix_free;
@@ -64,14 +64,14 @@ classdef epi3Const < IntegratorConst & ExponentialIntegratorConst
             y_out = y_n + this.phi_evaluator.solve([0 1], hJ_n, u);
             t_out = t_in + h;
             
-            
-            if(final_step)
-                y_out = y_out(:,1); % keep only first output at last timestep
-            end
-            
             % Update counters.
             this.step_stats.recordStep(toc(step_start_time));
             
+        end
+        
+        function [t_user, y_user] = userOutput(this, t_in, y_in, struct_in, t_out, y_out, struct_out, problem)
+            t_user = t_out;
+            y_user = y_out(:, 1);
         end
         
     end
