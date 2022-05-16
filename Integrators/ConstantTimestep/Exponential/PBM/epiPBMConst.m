@@ -124,7 +124,7 @@ classdef epiPBMConst < IntegratorConst & ExponentialIntegratorConst
 
         end
         
-        function [t_out, y_out, step_struct] = step(this, t_in, y_in, step_struct, problem, final_step_flag)
+        function [t_out, y_out, step_struct] = step(this, t_in, y_in, step_struct, problem)
             
             step_start_time = tic;
             
@@ -140,13 +140,14 @@ classdef epiPBMConst < IntegratorConst & ExponentialIntegratorConst
                 end
             end
                                     
-            if(final_step_flag)
-                y_out = y_out(:, 1);
-            end
-
             % Update counters.
             this.step_stats.recordStep(toc(step_start_time));
             
+        end
+        
+        function [t_user, y_user] = userOutput(this, t_in, y_in, struct_in, t_out, y_out, struct_out, problem)
+            t_user = t_out;
+            y_user = y_out(:, 1);
         end
         
     end
