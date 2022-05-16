@@ -165,7 +165,7 @@ classdef DI_IMEX_BLKConst < BLKConst & IMEXConst
             end
         end
         
-        function [t_out, y_out, step_struct] = step(this, t_in, y_in, step_struct, problem, final_step)
+        function [t_out, y_out, step_struct] = step(this, t_in, y_in, step_struct, problem)
             
             % -- read data from struct ---------------------------------------------------------------------------------          
             h     = this.h;
@@ -280,11 +280,6 @@ classdef DI_IMEX_BLKConst < BLKConst & IMEXConst
                 this.step_stats.recordStep();
             end
             
-            if(final_step && ~isempty(this.a_out))
-                [t_out, y_out] = this.finalStep(t_in, y_in, y_out, step_struct, problem);
-                return;
-            end
-            
             % -- update F_in for next step -----------------------------------------------------------------------------
             if(this.linearize) % re-evaluate RHS using jacobian evaluated at output (instead of input)
                 yl = y_out(:, this.linearization_index);
@@ -334,51 +329,51 @@ classdef DI_IMEX_BLKConst < BLKConst & IMEXConst
             
         end
         
-        function [t_final, y_final] = finalStep(this, t_in, y_in, y_out, step_struct, problem)
+        function [t_user, y_user] = userOutput(this, t_in, y_in, step_struct_in, t_out, y_out, step_struct_out, problem)
             
             flag = ~isempty(this.a_out) && ~isempty(this.bi_out) && ~isempty(this.be_out) && ~isempty(this.c_out) && ~isempty(this.di_out) && ~isempty(this.de_out) && ~isempty(this.e_out);
             if(flag)
                 
                 % -- read data from struct -----------------------------------------------------------------------------
                 h = this.h;
-                q = step_struct.q;
+                q = step_struct_out.q;
                 
-                req_iRHS_flags = step_struct.req_iRHS_F;
-                req_eRHS_flags = step_struct.req_eRHS_F;
+                req_iRHS_flags = step_struct_out.req_iRHS_F;
+                req_eRHS_flags = step_struct_out.req_eRHS_F;
                 yl = y_in(:, this.linearization_index);
                 
                 % -- check if F input requires additional Evaluations (Implicit component) -----------------------------
                 uncomputed_Fi_in  = setdiff(find(this.bi_out), find(req_iRHS_flags));
                 for j = uncomputed_Fi_in(:)'
                     this.rhs_stats.startTimer(j);
-                    step_struct.Fi_in(:, j) = this.evalF(problem, y_in(:,j), yl, 1); % problem.RHS(y_in(:, j), 1);
+                    step_struct_out.Fi_in(:, j) = this.evalF(problem, y_in(:,j), yl, 1); % problem.RHS(y_in(:, j), 1);
                     this.rhs_stats.recordRHSEval();
                 end
                 % -- check if F output requires additional Evaluations (Implicit component) ----------------------------
                 uncomputed_Fi_out = setdiff(find(this.di_out), find(req_iRHS_flags));
                 for j = uncomputed_Fi_out(:)'
                     this.rhs_stats.startTimer(j);
-                    step_struct.Fi_out(:, j) = this.evalF(problem, y_out(:,j), yl, 1); %problem.RHS(y_out(:, j), 1);
+                    step_struct_out.Fi_out(:, j) = this.evalF(problem, y_out(:,j), yl, 1); %problem.RHS(y_out(:, j), 1);
                     this.rhs_stats.recordRHSEval();
                 end
                 % -- check if F input requires additional Evaluations --------------------------------------------------
                 uncomputed_Fe_in  = setdiff(find(this.be_out), find(req_eRHS_flags));
                 for j = uncomputed_Fe_in(:)'
                     this.rhs_stats.startTimer(j);
-                    step_struct.Fi_in(:, j) = this.evalF(problem, y_in(:,j), yl, 2); %problem.RHS(y_in(:, j), 2);
+                    step_struct_out.Fi_in(:, j) = this.evalF(problem, y_in(:,j), yl, 2); %problem.RHS(y_in(:, j), 2);
                     this.rhs_stats.recordRHSEval();
                 end
                 % -- check if F output requires additional Evaluations -------------------------------------------------
                 uncomputed_Fe_out = setdiff(find(this.de_out), find(req_eRHS_flags));
                 for j = uncomputed_Fe_out(:)'
                     this.rhs_stats.startTimer(j);
-                    step_struct.Fi_out(:, j) = this.evalF(problem, y_out(:,j), yl, 2); %problem.RHS(y_out(:, j), 2);
+                    step_struct_out.Fi_out(:, j) = this.evalF(problem, y_out(:,j), yl, 2); %problem.RHS(y_out(:, j), 2);
                     this.rhs_stats.recordRHSEval();
                 end
                 
                 % -- form nonlinear equation y = b + c * f(y) --------------------------------------------------------------
-                b = y_in * this.a_out(:) + h * (step_struct.Fi_in * this.bi_out(:) + step_struct.Fe_in * this.be_out(:)) + ...
-                    y_out * this.c_out(:) + h * (step_struct.Fi_out * this.di_out(:) + step_struct.Fe_out * this.de_out(:));
+                b = y_in * this.a_out(:) + h * (step_struct_out.Fi_in * this.bi_out(:) + step_struct_out.Fe_in * this.be_out(:)) + ...
+                    y_out * this.c_out(:) + h * (step_struct_out.Fi_out * this.di_out(:) + step_struct_out.Fe_out * this.de_out(:));
                 c = h * this.e_out;
                 
                 if(c ~= 0) % -- solve linear system ---------------------------------------------------------------------
@@ -391,29 +386,29 @@ classdef DI_IMEX_BLKConst < BLKConst & IMEXConst
                         y_guess = y_out(:, nearest_index - q);
                     end
                     % -- solve system --------------------------------------------------------------------------------------
-                    [y_final, clean_exit] = this.linear_solver.solveBC(problem.J(y_in(:,1),1), b, c, y_guess);
+                    [y_user, clean_exit] = this.linear_solver.solveBC(problem.J(y_in(:,1),1), b, c, y_guess);
                     if(imag(this.z_out) == 0 && problem.real_valued)
-                        y_final = real(y_final);
+                        y_user = real(y_user);
                     end
-                    emergency_exit = ((~clean_exit) || any(isinf(y_final)) || any(isnan(y_final)));
+                    emergency_exit = ((~clean_exit) || any(isinf(y_user)) || any(isnan(y_user)));
                     if(emergency_exit)
-                        t_final = NaN;
-                        y_final = NaN;
+                        t_user = NaN;
+                        y_user = NaN;
                         return;
                     end
                 else % -- system is explicit -------------------------------------------------------------------------------
                     if(imag(this.z_out) == 0 && problem.real_valued)
-                        y_final = real(b);
+                        y_user = real(b);
                     else
-                        y_final = b;
+                        y_user = b;
                     end
                 end
                 
-                t_final = problem.tspan(end) + h * this.z_out; % output value
+                t_user = problem.tspan(end) + h * this.z_out; % output value
                 
             else
-                t_final = t_in + this.h;
-                y_final = y_in;
+                t_user = t_in + this.h;
+                y_user = y_in;
             end
             
         end
