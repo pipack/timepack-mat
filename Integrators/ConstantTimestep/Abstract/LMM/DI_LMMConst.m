@@ -88,7 +88,7 @@ classdef DI_LMMConst < IntegratorConst & ImplicitIntegratorConst
             
         end
         
-        function [t_out, y_out, step_struct] = step(this, t_in, y_in, step_struct, problem, final_step)
+        function [t_out, y_out, step_struct] = step(this, t_in, y_in, step_struct, problem)
             
             % -- read data from struct ---------------------------------------------------------------------------------
             h         = this.h;
@@ -146,13 +146,12 @@ classdef DI_LMMConst < IntegratorConst & ImplicitIntegratorConst
                 end
             end
             
-            % -- keep only final output at last step -------------------------------------------------------------------
-            if(final_step) 
-                t_out = t_out(end);
-                y_out = y_out(:, end);
-            end
-            
             this.step_stats.recordStep();         
+        end
+        
+        function [t_user, y_user] = userOutput(this, t_in, y_in, struct_in, t_out, y_out, struct_out, problem)
+            t_user = t_out(end);
+            y_user = y_out(:, end);
         end
         
     end
