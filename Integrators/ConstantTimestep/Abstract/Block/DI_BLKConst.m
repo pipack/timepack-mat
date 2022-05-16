@@ -115,7 +115,7 @@ classdef DI_BLKConst < BLKConst & ImplicitIntegratorConst
             
         end 
         
-        function [t_out, y_out, step_struct] = step(this, t_in, y_in, step_struct, problem, final_step)
+        function [t_out, y_out, step_struct] = step(this, t_in, y_in, step_struct, problem)
             
             % -- read data from struct ---------------------------------------------------------------------------------          
             h     = this.h;
@@ -225,44 +225,40 @@ classdef DI_BLKConst < BLKConst & ImplicitIntegratorConst
                 this.rhs_stats.recordRHSEval();
                 this.step_stats.recordStep();
             end
-            
-            if(final_step && ~isempty(this.a_out))
-                [t_out, y_out] = this.finalStep(t_in, y_in, y_out, step_struct, problem);
-            end
-            
+                        
             % -- update F_in for next step -----------------------------------------------------------------------------
             step_struct.F_in = step_struct.F_out;
             
         end
         
-        function [t_final, y_final] = finalStep(this, t_in, y_in, y_out, step_struct, problem)
+        function [t_user, y_user] = userOutput(this, t_in, y_in, step_struct_in, t_out, y_out, step_struct_out, problem)
             
             flag = ~isempty(this.a_out) && ~isempty(this.b_out) && ~isempty(this.c_out) && ~isempty(this.d_out) && ~isempty(this.e_out);
             if(flag)
                 
                 % -- read data from struct ---------------------------------------------------------------------------------
                 h = this.h;
-                q = step_struct.q;
-                req_RHS_flags = step_struct.req_RHS_F;
+                q = step_struct_out.q;
+                req_RHS_flags = step_struct_out.req_RHS_F;
                 
                 % -- check if F input requires additional Evaluations ------------------------------------------------------
                 uncomputed_F_in  = setdiff(find(this.b_out), find(req_RHS_flags));
                 for j = uncomputed_F_in(:)'
                     this.rhs_stats.startTimer(j);
-                    step_struct.F_in(:, j) = problem.RHS(y_in(:, j));
+                    step_struct_out.F_in(:, j) = problem.RHS(y_in(:, j));
                     this.rhs_stats.recordRHSEval();
                 end
                 % -- check if F output requires additional Evaluations -----------------------------------------------------
                 uncomputed_F_out = setdiff(find(this.d_out), find(req_RHS_flags));
                 for j = uncomputed_F_out(:)'
                     this.rhs_stats.startTimer(j);
-                    step_struct.F_out(:, j) = problem.RHS(y_out(:, j));
+                    step_struct_out.F_out(:, j) = problem.RHS(y_out(:, j));
                     this.rhs_stats.recordRHSEval();
                 end
                 
                 % -- form nonlinear equation y = b + c * f(y) --------------------------------------------------------------
-                b = y_in * this.a_out(:) + h * (step_struct.F_in * this.b_out(:)) + ...
-                    y_out * this.c_out(:) + h * (step_struct.F_out * this.d_out(:));
+                b = y_in * this.a_out(:) + h * (step_struct_out.F_in * this.b_out(:)) + ...
+                    y_out * this.c_out(:) + h * (step_struct_out.F_out * this.d_out(:));
                 c = h * this.e_out;
                 
                 if(c ~= 0) % -- solve nonlinear system ---------------------------------------------------------------------
@@ -275,29 +271,29 @@ classdef DI_BLKConst < BLKConst & ImplicitIntegratorConst
                         y_guess = y_out(:, nearest_index - q);
                     end
                     % -- solve system --------------------------------------------------------------------------------------
-                    [y_final, clean_exit] = this.nonlinear_solver.solveBC(problem, b, c, y_guess);
+                    [y_user, clean_exit] = this.nonlinear_solver.solveBC(problem, b, c, y_guess);
                     if(imag(this.z_out) == 0 && problem.real_valued)
-                        y_final = real(y_final);
+                        y_user = real(y_user);
                     end
-                    emergency_exit = ((~clean_exit) || any(isinf(y_final)) || any(isnan(y_final)));
+                    emergency_exit = ((~clean_exit) || any(isinf(y_user)) || any(isnan(y_user)));
                     if(emergency_exit)
-                        t_final = NaN;
-                        y_final = NaN;
+                        t_user = NaN;
+                        y_user = NaN;
                         return;
                     end
                 else % -- system is explicit -------------------------------------------------------------------------------
                     if(imag(this.z_out) == 0 && problem.real_valued)
-                        y_final = real(b);
+                        y_user = real(b);
                     else
-                        y_final = b;
+                        y_user = b;
                     end
                 end
                 
-                t_final = problem.tspan(end) + h * this.z_out; % output value
+                t_user = problem.tspan(end) + h * this.z_out; % output value
                 
             else
-                t_final = t_in + this.h;
-                y_final = y_in;
+                t_user = t_in + this.h;
+                y_user = y_in;
             end
             
         end
