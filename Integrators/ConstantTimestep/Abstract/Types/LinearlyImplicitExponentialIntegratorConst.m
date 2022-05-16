@@ -23,7 +23,7 @@ classdef LinearlyImplicitExponentialIntegratorConst < IntegratorConst
             % -- set props ---------------------------------------------------------------------------------------------
             this.phi_evaluator = options.phi_evaluator;
             this.linear_solver = options.linear_solver;
-            this.mode = 1;
+            this.mode = options.mode;
         end
            
         function J = RHSli(this, problem, u)
