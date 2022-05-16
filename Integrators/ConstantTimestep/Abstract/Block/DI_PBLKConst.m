@@ -31,7 +31,7 @@ classdef DI_PBLKConst < DI_BLKConst
             % -- set stepsize ------------------------------------------------------------------------------------------
             this.setStepsize(problem);
             % -- obtain initial conditions -----------------------------------------------------------------------------
-            [t_in, y_in, clean_exit] = this.initialConditions(problem);
+            [t_out, y_out, clean_exit] = this.initialConditions(problem);
             if(~clean_exit)
                 t_out = NaN;
                 y_out = NaN;
@@ -52,31 +52,35 @@ classdef DI_PBLKConst < DI_BLKConst
             num_steps = this.num_timesteps;
             
             spmd(num_proc)
-                [struct_in, y_in] = this.initStepStruct(t_in, y_in, problem);
+                [struct_out, y_out] = this.initStepStruct(t_out, y_out, problem);
                 for i = 1 : num_steps
-                    final_step_flag = (i == num_steps);
-                    [t_in, y_in, struct_in] = this.step(t_in, y_in, struct_in, problem, final_step_flag);
-                    % -- emergency exit conditions ---------------------------------------------------------------------
+                    % --> step
+                    t_in      = t_out;
+                    struct_in = struct_out;
+                    y_in      = y_out;                
+                    [t_out, y_out, struct_out] = this.step(t_in, y_in, struct_in, problem);
+                    % --> emergency exit conditions
                     if(labindex == num_proc)
                         emergency_exit_flag = any(isinf(y_in(:))) || any(isnan(y_in(:)));
                         labSend(emergency_exit_flag, 1:num_proc-1, 2)
                         if(emergency_exit_flag)
-                            t_in = NaN;
-                            y_in = NaN;
+                            t_out = NaN;
+                            y_out = NaN;
                             warning('Integrator: Emergency exit at step %i', i);
                             break;
                         end
                     else
                         emergency_exit_flag = labReceive(num_proc, 2);
                         if(emergency_exit_flag)
-                            t_in = NaN;
-                            y_in = NaN;
+                            t_out = NaN;
+                            y_out = NaN;
                             break;
                         end                        
                     end
                 end
             end
-            t_out = t_in; y_out = y_in{num_proc};
+            [t_out, y_out] = this.userOutput(t_in{num_proc}, y_in{num_proc}, struct_in{num_proc}, t_out{num_proc}, y_out{num_proc}, struct_out{num_proc}, problem);
+            
             this.step_stats.recordStep(toc(start_step_time));
             % -- output solution if only one output argument -----------------------------------------------------------
             if(nargout <= 1)
@@ -200,10 +204,6 @@ classdef DI_PBLKConst < DI_BLKConst
                     for conj_ind = step_struct.conj_inds
                         y_out(:, conj_ind) = conj(y_out(:, this.conjugate_outputs(conj_ind)));
                         step_struct.F_out(:, conj_ind) = conj(step_struct.F_out(:, this.conjugate_outputs(conj_ind)));
-                    end
-
-                    if(final_step)  % -- compute final output on leader ------------------------------------------------
-                        [t_out, y_out] = this.finalStep(t_in, y_in, y_out, step_struct, problem);
                     end
 
                     % -- update F_in for next step ---------------------------------------------------------------------
