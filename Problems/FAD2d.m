@@ -1,5 +1,5 @@
 % ======================================================================================================================
-% The Advection-Diffusion (AD) equation
+% Forced Advection-Diffusion (AD) equation
 %
 %   u_t = delta * (u_x + u_y) + epsilon * (u_xx + u_yy) + f(t,y)
 %
