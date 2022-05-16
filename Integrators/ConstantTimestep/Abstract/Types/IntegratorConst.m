@@ -8,7 +8,6 @@
 %
 % 2. starting_times : vector of starting times relative in natural coordinates tau = (t - t_0)/h.
 %                    
-%
 % 3. starting_integrator : starting integrator for computing initial times
 %
 % 4. starting_integrator_timeout : maximum time for determining initial conditions. 
@@ -52,8 +51,9 @@ classdef IntegratorConst < handle
     end
     
     methods (Abstract = true, Access = protected)
-        step(this, t_in, y_in, step_struct, problem, final_step);
-        initStepStruct(this, t_in, y_in, problem);
+        initStepStruct(this, t_in, y_in, problem);                              % initializes data for timestepping
+        step(this, t_in, y_in, step_struct, problem);                           % advances timestep
+        userOutput(t_in, y_in, struct_in, t_out, y_out, struct_out, problem);   % returns user output
     end
     
     methods
@@ -97,7 +97,7 @@ classdef IntegratorConst < handle
             % -- set stepsize ------------------------------------------------------------------------------------------
             this.setStepsize(problem);
             % -- obtain initial conditions -----------------------------------------------------------------------------
-            [t_in, y_in, clean_exit] = this.initialConditions(problem);
+            [t_out, y_out, clean_exit] = this.initialConditions(problem);
             if(~clean_exit)
                 t_out = NaN;
                 y_out = NaN;
@@ -105,20 +105,23 @@ classdef IntegratorConst < handle
                 return;
             end
             % -- solve problem -----------------------------------------------------------------------------------------
-            [struct_in, y_in] = this.initStepStruct(t_in, y_in, problem); % note: code was modified on Dec 4, 2018. Must return y_in as well
+            [struct_out, y_out] = this.initStepStruct(t_out, y_out, problem); % note: code was modified on Dec 4, 2018. Must return y_in as well
             num_steps = this.num_timesteps;
             for i = 1 : num_steps
-                final_step_flag = (i == num_steps);              
-                [t_in, y_in, struct_in] = this.step(t_in, y_in, struct_in, problem, final_step_flag);
-                % -- emergency exit conditions ---------------------------------------------------------------------
-                if(any(isinf(y_in(:))) || any(isnan(y_in(:))))
-                    t_in = NaN;
-                    y_in = NaN;
+                % --> step
+                t_in      = t_out;
+                struct_in = struct_out;
+                y_in      = y_out;                
+                [t_out, y_out, struct_out] = this.step(t_in, y_in, struct_in, problem);
+                % --> emergency exit conditions
+                if(any(isinf(y_out(:))) || any(isnan(y_out(:))))
+                    t_out = NaN;
+                    y_out = NaN;
                     warning('Integrator: Emergency exit at step %i', i);
                     break;
                 end
             end
-            t_out = t_in; y_out = y_in;
+            [t_out, y_out] = this.userOutput(t_in, y_in, struct_in, t_out, y_out, struct_out, problem);
             % -- output solution if only one output argument -----------------------------------------------------------
             if(nargout <= 1)
                 t_out = y_out;
