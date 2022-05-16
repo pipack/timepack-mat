@@ -81,15 +81,31 @@ classdef DI_IMEX_BLKConst < BLKConst & IMEXConst
             this.setNonZeroMatrixIndices();
         end
         
-        function setProperties(this, prop_struct)
-            setProperties@BLKConst(this, prop_struct);
+        % REMARK: function body is partially copied from IntegratorConst to
+        % provide access to protected variables of DI_BLKConst class. 
+        % Calling the superclass method directly will not work since it 
+        % cannot access protected properties (e.g. A,B,C,D matrices)
+        function setClassProps(this, prop_struct)
+        
+            % --> copied from IntegratorConst
+            props     = fieldnames(prop_struct);
+            num_props = length(props);
+            for i = 1 : num_props
+                prop = props{i};
+                if(ismember(prop, this.mutable_props))
+                    this.(prop) = prop_struct.(prop);
+                else
+                    warning('property %s cannot be modified using setClassProps method.', prop);
+                end                
+            end
             
-            % -- recompute fields if coefficient matrices are redefined ------------------------------------------------
+            % --> additional logic
             fields = fieldnames(prop_struct);
-            if(contains(fields, {'A', 'B', 'C', 'D'})) 
+            if(contains(fields, {'A', 'Bi', 'Be', 'C', 'Di', 'De'})) 
                 this.verifyCefficientMatrices();
                 this.setNonZeroMatrixIndices();
             end
+
         end
         
     end

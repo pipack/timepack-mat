@@ -38,23 +38,7 @@ classdef BLKConst < IntegratorConst
             this.eval_RHS = options.eval_RHS;
             this.extrapolate_initial_guess = options.extrapolate_initial_guess;            
         end
-        
-        %Note: method is copied from IntegratorConst so that coefficient matrices can be modified
-        function setClassProps(this, prop_struct) % -- allow modification of internal class properties ----------------
-        
-            props     = fieldnames(prop_struct);
-            num_props = length(props);
-            for i = 1 : num_props
-                prop = props{i};
-                if(ismember(prop, this.mutable_props))
-                    this.(prop) = prop_struct.(prop);
-                else
-                    warning('property %s cannot be modified using setClassProps method.', prop);
-                end                
-            end
-
-        end
-        
+                
     end
     
     methods (Access = protected) % -- generic helper functions ---------------------------------------------------------
