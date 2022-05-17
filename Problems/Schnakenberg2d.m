@@ -124,7 +124,7 @@ classdef Schnakenberg2d < Problem
         end
         
         function setDimension(this)
-            this.dimension = this.params.N ^ 2;
+            this.dimension = 2 * this.params.N ^ 2;
         end
         
         function setInitialCondition(this)
