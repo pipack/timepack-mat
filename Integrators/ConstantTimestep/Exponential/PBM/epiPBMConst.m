@@ -70,6 +70,22 @@ classdef epiPBMConst < IntegratorConst & ExponentialIntegratorConst
     
     methods (Access = protected)
         
+        function [t_out, y_out, clean_exit] = initialConditions(this,problem)
+            [t_out, y_out, clean_exit] = initialConditions@IntegratorConst(this, problem);
+            if(~clean_exit)
+                return;
+            end
+            
+            % -- iterate for initial conditions ---------------------------
+            step_struct = this.initStepStruct(t_out, y_out, problem);
+            t_out = t_out + step_struct.r * this.z;
+            y_out = repmat(y_out, [1, this.q]);
+            
+            for i = 1 : this.q + this.kappa
+                [t_out, y_out, step_struct] = this.pstep(0, t_out, y_out, step_struct, problem);
+            end            
+        end        
+        
         function [step_struct, y_in] = initStepStruct(this, t_in, y_in, problem)
                         
             ode_dim = size(y_in, 1);
@@ -82,13 +98,6 @@ classdef epiPBMConst < IntegratorConst & ExponentialIntegratorConst
                 'rJ_n', [] ...
             );
         
-            y_in = repmat(y_in, [1, this.q]);
-            
-            % -- iterate for initial conditions ------------------------------------------------------------------------
-            for i = 1 : this.q + this.kappa
-                [~, y_in, step_struct] = this.pstep(0, t_in, y_in, step_struct, problem);
-            end
-                
         end
         
         function [t_out, y_out, step_struct, exit_flag] = pstep(this, alpha, t_in, y_in, step_struct, problem)
