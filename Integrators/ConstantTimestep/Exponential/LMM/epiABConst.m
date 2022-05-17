@@ -55,7 +55,7 @@ classdef epiABConst < IntegratorConst & ExponentialIntegratorConst
             end
         end
         
-        function [step_struct, y_in] = initStepStruct(this, t_in, y_in, problem)
+        function [step_struct] = initStepStruct(this, t_in, y_in, problem)
             
             % -- define remainder function -----------------------------------------------------------------------------
             step_struct = struct(...

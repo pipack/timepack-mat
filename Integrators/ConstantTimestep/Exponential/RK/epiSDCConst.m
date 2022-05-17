@@ -58,7 +58,7 @@ classdef epiSDCConst < IntegratorConst & ExponentialIntegratorConst
     
     methods (Access = protected)
         
-        function [step_struct, y_in] = initStepStruct(this, t_in, y_in, problem)
+        function [step_struct] = initStepStruct(this, t_in, y_in, problem)
             ode_dim = size(y_in, 1);
             step_struct = struct(                           ...
                 'y',    zeros(ode_dim, this.num_nodes),     ...             % struct for storing solution at substep

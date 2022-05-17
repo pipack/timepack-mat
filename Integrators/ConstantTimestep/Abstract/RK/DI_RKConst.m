@@ -41,7 +41,7 @@ classdef DI_RKConst < RKConst & ImplicitIntegratorConst
     
     methods (Access = protected)
         
-        function [step_struct, y_in] = initStepStruct(this, ~, y_in, ~)
+        function [step_struct] = initStepStruct(this, ~, y_in, ~)
             
             num_stages = size(this.A, 1);
             ode_dim    = length(y_in);

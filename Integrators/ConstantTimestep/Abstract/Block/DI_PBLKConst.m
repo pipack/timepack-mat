@@ -52,7 +52,7 @@ classdef DI_PBLKConst < DI_BLKConst
             num_steps = this.num_timesteps;
             
             spmd(num_proc)
-                [struct_out, y_out] = this.initStepStruct(t_out, y_out, problem);
+                struct_out = this.initStepStruct(t_out, y_out, problem);
                 for i = 1 : num_steps
                     % --> step
                     t_in      = t_out;
@@ -92,7 +92,7 @@ classdef DI_PBLKConst < DI_BLKConst
     
     methods (Access = protected)
         
-        function [step_struct, y_in] = initStepStruct(this, ~, y_in, problem)
+        function [step_struct] = initStepStruct(this, ~, y_in, problem)
             
             num_proc = this.getNumProcessors();
             if(labindex == num_proc)
@@ -100,7 +100,7 @@ classdef DI_PBLKConst < DI_BLKConst
                     this.parallel_initial_guess = true;
                     warning('parallel_initial_guess set to true. This flag must always be true for parallel method.')
                 end
-                [step_struct, y_in] = initStepStruct@DI_BLKConst(this, [], y_in, problem);
+                step_struct = initStepStruct@DI_BLKConst(this, [], y_in, problem);
                 step_struct.conj_inds  = find(this.conjugate_outputs(:).' ~= 0); %ensure row vector so that it can be used as for loop indices
             else
                 step_struct = struct();

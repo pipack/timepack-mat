@@ -86,7 +86,7 @@ classdef epiPBMConst < IntegratorConst & ExponentialIntegratorConst
             end            
         end        
         
-        function [step_struct, y_in] = initStepStruct(this, t_in, y_in, problem)
+        function [step_struct] = initStepStruct(this, t_in, y_in, problem)
                         
             ode_dim = size(y_in, 1);
 

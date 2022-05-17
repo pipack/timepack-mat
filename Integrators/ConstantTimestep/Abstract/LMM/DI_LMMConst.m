@@ -58,7 +58,7 @@ classdef DI_LMMConst < IntegratorConst & ImplicitIntegratorConst
     
     methods (Access = protected)
         
-        function [step_struct, y_in] = initStepStruct(this, ~, y_in, problem)
+        function [step_struct] = initStepStruct(this, ~, y_in, problem)
             
             p           = length(this.starting_times);
             ode_dim     = size(y_in, 1);

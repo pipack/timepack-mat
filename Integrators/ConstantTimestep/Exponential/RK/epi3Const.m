@@ -31,7 +31,7 @@ classdef epi3Const < IntegratorConst & ExponentialIntegratorConst
     
     methods (Access = protected)
         
-        function [step_struct, y_in] = initStepStruct(this, t_in, y_in, problem)
+        function [step_struct] = initStepStruct(this, t_in, y_in, problem)
             step_struct = struct(...
                 'r', zeros(size(y_in,1), 2)    ...
                 );
