@@ -12,7 +12,9 @@
 %
 % 4. starting_integrator_timeout : maximum time for determining initial conditions. 
 %                                 
-% 5. order : order-of-accuracy
+% 5. max_num_store : integer cooresponding to the maximum number of solution points to store; default is one.
+%
+% 6. ind_store : specific indices to store (overrides num_store if specified ).
 %
 % -- Public Methods ----------------------------------------------------------------------------------------------------
 %
@@ -45,6 +47,9 @@ classdef IntegratorConst < handle
         num_timesteps = 1;
         starting_integrator;
         starting_integrator_timeout; % max time in seconds for computing each initial condition
+        % -- solution storage properties -------------------------------------------------------------------------------
+        max_num_store = 1;
+        ind_store = [];
         % -- stats objects ---------------------------------------------------------------------------------------------
         step_stats
         rhs_stats
@@ -63,8 +68,10 @@ classdef IntegratorConst < handle
             default_field_value_pairs = { ...
                 {'starting_integrator', []} ...
                 {'starting_integrator_timeout', 600} ...
-                {'graph_line_style',    {'k.--'}} ...
-                {'record_stats',        false} ...
+                {'graph_line_style', {'k.--'}} ...
+                {'record_stats',  false} ...
+                {'max_num_store', 1} ...
+                {'ind_store', []} ...
             };
             options = setDefaultOptions(options, default_field_value_pairs);
             
@@ -90,17 +97,29 @@ classdef IntegratorConst < handle
             end
         end
         
-        function [t_out, y_out] = solve(this, problem)
+        function set.ind_store(this, ind_store)
+            %SET.NUM_TIMESTEP ensure that num_timesteps is valid
+            input_is_int = all(floor(ind_store) == ind_store);
+            input_is_positive = all(ind_store > 1);
+            if(input_is_int && input_is_positive)
+                this.ind_store = ind_store;
+            else
+                warning('Integrator: ind_num_store must empty of array of integer smaller than num_steps');
+            end
+        end
+        
+        function [t_user, y_user] = solve(this, problem)
             if(isempty(this.num_timesteps))
                 error('Integrator: number of timesteps has not been set.');
             end
+            % -- initialize output variables ---------------------------------------------------------------------------
+            [y_user, t_user, i_store, store_index] = initOutputVars(this, problem);            
             % -- set stepsize ------------------------------------------------------------------------------------------
             this.setStepsize(problem);
             % -- obtain initial conditions -----------------------------------------------------------------------------
             [t_out, y_out, clean_exit] = this.initialConditions(problem);
             if(~clean_exit)
-                t_out = NaN;
-                y_out = NaN;
+                [t_user(store_index:end), y_user(:, store_index:end)] = deal(NaN);
                 warning('Integrator: Emergency exit during initial condition computation.');
                 return;
             end
@@ -109,22 +128,23 @@ classdef IntegratorConst < handle
             num_steps = this.num_timesteps;
             for i = 1 : num_steps
                 % --> step
-                t_in      = t_out;
-                struct_in = struct_out;
-                y_in      = y_out;                
+                [t_in, struct_in, y_in] = deal(t_out, struct_out, y_out);
                 [t_out, y_out, struct_out] = this.step(t_in, y_in, struct_in, problem);
                 % --> emergency exit conditions
                 if(any(isinf(y_out(:))) || any(isnan(y_out(:))))
-                    t_out = NaN;
-                    y_out = NaN;
+                    [t_user(store_index:end), y_user(:, store_index:end)] = deal(NaN);
                     warning('Integrator: Emergency exit at step %i', i);
                     break;
                 end
+                % --> store output
+                if(i == i_store(store_index))
+                    [t_user(store_index), y_user(:, store_index)] = this.userOutput(t_in, y_in, struct_in, t_out, y_out, struct_out, problem);
+                    store_index = store_index + 1;
+                end                
             end
-            [t_out, y_out] = this.userOutput(t_in, y_in, struct_in, t_out, y_out, struct_out, problem);
             % -- output solution if only one output argument -----------------------------------------------------------
             if(nargout <= 1)
-                t_out = y_out;
+                t_user = y_user;
             end
         end
         
@@ -327,6 +347,44 @@ classdef IntegratorConst < handle
             end
             if(problem.has('Jx'))
                 problem_ic.Jx =  @(varargin) exp_i_theta * problem.Jx(varargin{:});
+            end
+        end
+        
+        function [y_user, t_user, i_store, store_index] = initOutputVars(this, problem)
+            
+            % --> get solution indices that should be stored
+            i_store = this.getIndStore(this.num_timesteps, this.max_num_store, this.ind_store);
+            store_index = 1;
+            % --> initialize storage arrays            
+            y_user = zeros(problem.dimension, length(i_store));
+            t_user = zeros(length(i_store), 1);
+            % --> if needed, store initial condition           
+            if(i_store(1) == 0)
+                t_user(store_index)   = problem.tspan(1);
+                y_user(:,store_index) = problem.initial_condition;
+                store_index = 2;
+            end            
+        
+        end
+               
+        function inds = getIndStore(~, num_steps, max_store, ind_store)
+            % SETINDSTORE determines the indices of the timesteps that 
+            % should should be stored and returned to the user
+            
+            max_store = min(num_steps + 1, max_store);
+            
+            if(~isempty(ind_store)) % case 1 : user has specified ind_store
+                inds = sort(ind_store, 'asc');
+                if(inds(end) ~= num_steps)
+                    warning('final solution will not be returned. Check value of integrator ind_store parameter');
+                end
+            elseif(max_store == 1) % case 2 : num_store = 1 (only store last timestep)    
+                inds = num_steps;
+            else % case 2 : user has specified num_store > 1
+                delta = floor(num_steps / (max_store - 1)); % divisor
+                shift = mod(num_steps, max_store - 1);      % remainder
+                skips = [0, delta * ones(1, max_store - 1)] + [0, ones(1, shift), zeros(1, max_store - 1 - shift)]; % distribute remainder over initial steps
+                inds  = cumsum(skips);
             end
         end
         
