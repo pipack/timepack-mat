@@ -124,7 +124,7 @@ classdef IntegratorConst < handle
                 return;
             end
             % -- solve problem -----------------------------------------------------------------------------------------
-            [struct_out, y_out] = this.initStepStruct(t_out, y_out, problem); % note: code was modified on Dec 4, 2018. Must return y_in as well
+            struct_out = this.initStepStruct(t_out, y_out, problem);
             num_steps = this.num_timesteps;
             for i = 1 : num_steps
                 % --> step
