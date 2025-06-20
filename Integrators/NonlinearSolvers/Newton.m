@@ -65,7 +65,7 @@ classdef Newton < NonlinearSolver
                 part_args = {part};
             end
             
-            zv = zeros(length(b),1); % initial guess
+            zv = zeros(length(x0),1); % initial guess
             
             % -- define function ---------------------------------------------------------------------------------------
             function Gx = G(x)
